@@ -911,8 +911,11 @@ template<class T> view<T>& matrix<T>::c_ (size_t c1, size_t c2) {
 	return *v;
 }
 
-template<class T> view<T>& matrix<T>::mask (const matrix<bool>& logic_indices);
-template<class T> view<T>& matrix<T>::slice (	const vector<size_t>& row_indices,
-									const std::vector<size_t>& col_indices);
+template<class T> view<T>& matrix<T>::slice (	const vector<size_t>& rows,
+									const std::vector<size_t>& cols) {
+	assert(rows.size() > 0 && cols.size() > 0);
+	
+
+}
 template<class T> view<T>& matrix<T>::sub (size_t r1, size_t r2, size_t c1, size_t c2);
 #endif
