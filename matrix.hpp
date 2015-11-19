@@ -26,6 +26,7 @@ public:
 		matrix (size_t rows, size_t cols);
 		matrix (T *raw_data, size_t rows, size_t cols);
 		matrix (const matrix<T>& mx);
+		matrix (matrix<T>&& mx);
 		~matrix ();
 
 		const T* ptr() const;
@@ -49,7 +50,10 @@ public:
 
 		T max () const;
 		T min () const;
-		T mean () const;
+		T sum () const;
+		matrix<T>& max (int axis) const;
+		matrix<T>& min (int axis) const;
+		matrix<T>& sum (int axis) const;
 
 		// fillers
 		matrix<T>& fill (T value);
@@ -57,19 +61,20 @@ public:
 		matrix<T>& randn ();
 
 		// slicing methods
-		view<T>& r_ (const vector<size_t>& row_indices);
-		view<T>& r_ (const matrix<bool>& logic_indices);
+		view<T>& r_ (const vector<size_t>& rows);
+		view<T>& r_ (const matrix<bool>& rows);
 		view<T>& r_ (size_t r1, size_t r2);
 
-		view<T>& c_ (const vector<size_t>& col_indices);
-		view<T>& c_ (const matrix<bool>& logic_indices);
+		view<T>& c_ (const vector<size_t>& cols);
+		view<T>& c_ (const matrix<bool>& cols);
 		view<T>& c_ (size_t c1, size_t c2);
 
-		view<T>& mask (const matrix<bool>& logic_indices);
-		view<T>& slice (	const vector<size_t>& rows, const std::vector<size_t>& cols);
-		view<T>& sub (size_t r1, size_t r2, size_t c1, size_t c2);
+		view<T>& grid (const matrix<bool>& rows, const matrix<bool>& cols);
+		view<T>& grid (const vector<size_t>& rows, const std::vector<size_t>& cols);
+		view<T>& area (size_t r1, size_t r2, size_t c1, size_t c2);
 
 		// assignment operators
+		matrix<T>& operator= (matrix<T>&& mx);
 		matrix<T>& operator= (const matrix<T>& mx);
 		matrix<T>& operator= (const view<T>& mx);
 
@@ -85,7 +90,7 @@ public:
 
 		// static methods
 		static matrix<T>* load (const char* filename, size_t rows, size_t cols);
-		static void dump (const char* filename, matrix<T>& mx);
+		static void 			dump (const char* filename, matrix<T>& mx);
 
 		static matrix<T>& tile (const matrix<T>& pattern, size_t nrows, size_t ncols);
 
@@ -215,7 +220,6 @@ template<class T> T matrix<T>::min () const {
 	}
 	return min_value;
 }
-
 template<class T> T matrix<T>::max () const {
 	T max_value = numeric_limits<T>::min();
 	const T *ptr = data.data();
@@ -226,14 +230,93 @@ template<class T> T matrix<T>::max () const {
 	}
 	return max_value;
 }
-
-template<class T> T matrix<T>::mean () const {
+template<class T> T matrix<T>::sum () const {
 	T value = 0;
 	const T *ptr = data.data();
 	size_t m = data.size();
 	for (size_t i=0; i < m; ++i)
 		value += ptr[i];
-	return value/T(m);
+	return value;
+}
+template<class T> matrix<T>& matrix<T>::max (int axis) const {
+	assert (axis == 1 || axis == 0);
+	if (axis == 0) {
+		matrix<T> *vector = new matrix<T>(1, num_cols);
+		T *ptr = data.data();
+		for (size_t j=0; j < num_cols; ++j) {
+			T max_value = numeric_limits<T>::min();
+			for (size_t i=0; i < num_rows; ++i) {
+				if (max_value < ptr[i*num_cols + j])
+					max_value = ptr[i*num_cols + j];
+			}
+			(*vector)(0,j) = max_value;
+		}
+		return *vector;
+	} else {
+		matrix<T> *vector = new matrix<T>(num_rows, 1);
+		T *ptr = data.data();
+		for (size_t i=0; i < num_rows; ++i) {
+			T max_value = numeric_limits<T>::min();
+			for (size_t j=0; j < num_cols; ++j) {
+				if (max_value < ptr[i*num_cols + j])
+					max_value = ptr[i*num_cols + j];
+			}
+			(*vector)(i,0) = max_value;
+		}
+		return *vector;
+	}
+}
+template<class T> matrix<T>& matrix<T>::min (int axis) const {
+	assert (axis == 1 || axis == 0);
+	if (axis == 0) {
+		matrix<T> *vector = new matrix<T>(1, num_cols);
+		T *ptr = data.data();
+		for (size_t j=0; j < num_cols; ++j) {
+			T min_value = numeric_limits<T>::max();
+			for (size_t i=0; i < num_rows; ++i) {
+				if (max_value > ptr[i*num_cols + j])
+					max_value = ptr[i*num_cols + j];
+			}
+			(*vector)(0,j) = min_value;
+		}
+		return *vector;
+	} else {
+		matrix<T> *vector = new matrix<T>(num_rows, 1);
+		T *ptr = data.data();
+		for (size_t i=0; i < num_rows; ++i) {
+			T min_value = numeric_limits<T>::max();
+			for (size_t j=0; j < num_cols; ++j) {
+				if (max_value > ptr[i*num_cols + j])
+					max_value = ptr[i*num_cols + j];
+			}
+			(*vector)(i,0) = min_value;
+		}
+		return *vector;
+	}
+}
+template<class T> matrix<T>& matrix<T>::sum (int axis) const {
+	assert (axis == 1 || axis == 0);
+	if (axis == 0) {
+		matrix<T> *vector = new matrix<T>(1, num_cols);
+		T *ptr = data.data();
+		for (size_t j=0; j < num_cols; ++j) {
+			T sum_value = 0.0;
+			for (size_t i=0; i < num_rows; ++i)
+				sum_value += ptr[i*num_cols + j];
+			(*vector)(0,j) = sum_value;
+		}
+		return *vector;
+	} else {
+		matrix<T> *vector = new matrix<T>(num_rows, 1);
+		T *ptr = data.data();
+		for (size_t i=0; i < num_rows; ++i) {
+			T sum_value = 0.0;
+			for (size_t j=0; j < num_cols; ++j)
+				sum_value += ptr[i*num_cols + j];
+			(*vector)(i,0) = sum_value;
+		}
+		return *vector;
+	}
 }
 
 template<class T> matrix<T>& matrix<T>::operator= (const matrix<T>& mx) {
@@ -247,6 +330,12 @@ template<class T> matrix<T>& matrix<T>::operator= (const matrix<T>& mx) {
 		copy(mx.ptr(), mx.ptr() + mx.size(), data.data());
 	}
 	return *this;
+}
+template<class T> matrix<T>& matrix<T>::operator= (matrix<T>&& mx) {
+	data.clear();
+	num_cols = mx.cols();
+	num_rows = mx.rows();
+	
 }
 
 template<class T> matrix<T>& matrix<T>::operator= (const view<T>& mx) {
@@ -270,12 +359,16 @@ template<class T> matrix<T>& matrix<T>::add(const matrix<T>& mx) {
 	size_t m = mx.size();
 	for (size_t i = 0; i < m; ++i)
 		ptrd[i] += ptrs[i];
-	// for (size_t i=0; i < mx.rows(); ++i)
-	// 	for (size_t j=0; j < mx.cols(); ++j)
-	// 		data[i * num_cols + j] += mx(i,j);
 	return *this;
 }
-
+template<class T> matrix<T>& matrix<T>::add(const view<T>& mx) {
+	assert(mx.rows() == this->rows() && mx.cols() == this->cols());
+	T *ptrd = data.data();
+	for (size_t i=0; i < num_rows; ++i)
+		for (size_t j=0; j < num_cols; ++j)
+			ptrd[i*num_cols + j] = mx(i,j);
+	return *this;
+}
 template<class T> matrix<T>& matrix<T>::mul(const matrix<T>& mx) {
 	assert(mx.rows() == this->rows() && mx.cols() == this->cols());
 	const T *ptrs = mx.ptr();
@@ -285,7 +378,14 @@ template<class T> matrix<T>& matrix<T>::mul(const matrix<T>& mx) {
 		ptrd[i] *= ptrs[i];
 	return *this;
 }
-
+template<class T> matrix<T>& matrix<T>::mul(const matrix<T>& mx) {
+	assert(mx.rows() == this->rows() && mx.cols() == this->cols());
+	T *ptrd = data.data();
+	for (size_t i=0; i < num_rows; ++i)
+		for (size_t j=0; j < num_cols; ++j)
+			ptrd[i*num_cols + j] *= mx(i,j);
+	return *this;
+}
 template<class T> matrix<T>& matrix<T>::dot(const matrix<T>& mx) {
 	assert(this->num_cols == mx.rows());
 	size_t p = mx.cols();
@@ -298,7 +398,23 @@ template<class T> matrix<T>& matrix<T>::dot(const matrix<T>& mx) {
 	for (size_t i=0; i < num_rows; ++i)
 		for (size_t j=0; j < p; ++j)
 			for (size_t k=0; k < num_cols; ++k)
-				ptr_c[i * p + j] += ptr_b[i * num_cols + k] * ptr_a[k * p + i];
+				ptr_c[i * p + j] += ptr_b[i * num_cols + k] * ptr_a[j * p + k];
+	*this = tmp;
+	return *this;
+}
+template<class T> matrix<T>& matrix<T>::dot(const view<T>& mx) {
+	assert(this->num_cols == mx.rows());
+	size_t p = mx.cols();
+	matrix<T> tmp(num_rows, mx.cols());
+	tmp.fill(0);
+	const T *ptr_a = mx.ptr();
+	T *ptr_b = data.data();
+	T *ptr_c = tmp.mutable_ptr();
+	#pragma omp parallel for
+	for (size_t i=0; i < num_rows; ++i)
+		for (size_t j=0; j < p; ++j)
+			for (size_t k=0; k < num_cols; ++k)
+				ptr_c[i * p + j] += ptr_b[i * num_cols + k] * mx(j,k);
 	*this = tmp;
 	return *this;
 }
@@ -317,50 +433,49 @@ template<class T> void matrix<T>::size(size_t rows, size_t cols) {
 template<class T> const T* matrix<T>::ptr() const { return data.data(); }
 template<class T> T* matrix<T>::mutable_ptr() { return data.data(); }
 
-template<class T>
-matrix<T>::matrix (const matrix<T>& mx) {
+template<class T> matrix<T>::matrix (const matrix<T>& mx) {
 	this->num_rows = mx.num_rows;
 	this->num_cols = mx.num_cols;
 	this->data = mx.data;
 }
 
-template<class T>
-matrix<T>::~matrix() {
+template<class T> matrix<T>::matrix (matrix<T>&& mx) {
+	data.clear();
+	num_rows = mx.num_rows;
+	num_cols = mx.num_cols;
+	data = std::move(mx.data);
+}
+
+template<class T> matrix<T>::~matrix() {
 	data.clear();
 }
 
-template<class T>
-matrix<T>::matrix ()
+template<class T> matrix<T>::matrix ()
 	: num_rows(0),
 	  num_cols(0),
 	  data(0) {}
 
-template<class T>
-matrix<T>::matrix (size_t rows, size_t cols)
+template<class T> matrix<T>::matrix (size_t rows, size_t cols)
 	: num_rows(rows),
 	  num_cols(cols),
 	  data(rows * cols) {}
 
-template<class T>
-matrix<T>::matrix (T* raw_data, size_t rows, size_t cols)
+template<class T> matrix<T>::matrix (T* raw_data, size_t rows, size_t cols)
 	: num_rows(rows),
 	  num_cols(cols),
 	  data(raw_data, raw_data + rows*cols) {}
 
-template<class T>
-T& matrix<T>::operator () (size_t i, size_t j)
+template<class T> T& matrix<T>::operator () (size_t i, size_t j)
 {
 	return data[i * num_cols + j];
 }
 
-template<class T>
-T matrix<T>::operator () (size_t i, size_t j) const
+template<class T> T matrix<T>::operator () (size_t i, size_t j) const
 {
 	return data[i * num_cols + j];
 }
 
-template<class T>
-matrix<T>* matrix<T>::load (const char *filename, size_t rows, size_t cols) {
+template<class T> matrix<T>* matrix<T>::load (const char *filename, size_t rows, size_t cols) {
 	ifstream file (filename, ios::binary | ios::in | ios::ate);
 	if (file.is_open()) {
 		streampos size = file.tellg();
@@ -839,19 +954,22 @@ template<class T> view<T>& matrix<T>::r_ (const vector<size_t>& row_indices) {
 	vector<size_t> cols, rows;
 	for (size_t i=0; i < num_cols; ++i)
 		cols.push_back(i);
-	for (size_t j=0; j < row_indices.size(); ++j)
+	for (size_t j=0; j < row_indices.size(); ++j) {
 		if (row_indices[j] < num_rows && row_indices[j] >= 0)
 			rows.push_back(row_indices[j]);
+		else
+			assert (1==0);
+	}
 	view<T> *v = new view<T>(rows.size(), cols().size(), cols, rows, data.data());
 	return *v;
 }
-template<class T> view<T>& matrix<T>::r_ (const matrix<bool>& logic_indices) {
-	assert (logic_indices.cols() == 1 && logic_indices.rows() == num_rows);
+template<class T> view<T>& matrix<T>::r_ (const matrix<bool>& rows) {
+	assert (rows.cols() == 1 && rows.rows() == num_rows);
 	vector<size_t> cols, rows;
 	for (size_t i=0; i < num_cols; ++i)
 		cols.push_back(i);
-	for (size_t j=0; j < logic_indices.size(); ++j)
-		if (logic_indices(0,j) == true)
+	for (size_t j=0; j < rows.size(); ++j)
+		if (rows(j,0) == true)
 			rows.push_back(j);
 	view<T> *v = new view<T>(rows.size(), cols().size(), cols, rows, data.data());
 	return *v;
@@ -873,23 +991,26 @@ template<class T> view<T>& matrix<T>::r_ (size_t r1, size_t r2) {
 	return *v;
 }
 
-template<class T> view<T>& matrix<T>::c_ (const vector<size_t>& col_indices) {
+template<class T> view<T>& matrix<T>::c_ (const vector<size_t>& cols) {
 	vector<size_t> cols, rows;
 	for (size_t i=0; i < num_rows; ++i)
 		rows.push_back(i);
-	for (size_t j=0; j < col_indices.size(); ++j)
-		if (col_indices[j] < num_cols && col_indices[j] >= 0)
-			cols.push_back(col_indices[j]);
+	for (size_t j=0; j < cols.size(); ++j) {
+		if (cols[j] < num_cols && cols[j] >= 0)
+			cols.push_back(cols[j]);
+		else
+			assert (1==0);
+	}
 	view<T> *v = new view<T>(rows.size(), cols().size(), cols, rows, data.data());
 	return *v;
 }
-template<class T> view<T>& matrix<T>::c_ (const matrix<bool>& logic_indices) {
-	assert (logic_indices.rows() == 1 && logic_indices.cols() == num_cols);
+template<class T> view<T>& matrix<T>::c_ (const matrix<bool>& cols) {
+	assert (cols.rows() == 1 && cols.cols() == num_cols);
 	vector<size_t> cols, rows;
 	for (size_t i=0; i < num_rows; ++i)
 		rows.push_back(i);
-	for (size_t j=0; j < logic_indices.size(); ++j)
-		if (logic_indices(0,j) == true)
+	for (size_t j=0; j < cols.size(); ++j)
+		if (cols(0,j) == true)
 			cols.push_back(j);
 	view<T> *v = new view<T>(rows.size(), cols().size(), cols, rows, data.data());
 	return *v;
@@ -911,11 +1032,60 @@ template<class T> view<T>& matrix<T>::c_ (size_t c1, size_t c2) {
 	return *v;
 }
 
-template<class T> view<T>& matrix<T>::slice (	const vector<size_t>& rows,
-									const std::vector<size_t>& cols) {
-	assert(rows.size() > 0 && cols.size() > 0);
-	
-
+template<class T> view<T>& matrix<T>::grid (const matrix<bool>& rows, const matrix<bool>& cols) {
+	assert (rows.rows() == num_rows && rows.cols() == 1 && cols.rows() == 1 && cols.cols() == num_cols);
+	vector<size_t> cols, rows;
+	for (size_t i=0; i < num_rows; ++i)
+		rows.push_back(i);
+	for (size_t i=0; i < rows.size(); ++i)
+		if (rows(0,i) == true)
+			rows.push_back(i);
+	for (size_t j=0; j < cols.size(); ++j)
+		if (logic_indices(j,0) == true)
+			cols.push_back(j);
+	view<T> *v = new view<T>(rows.size(), cols().size(), cols, rows, data.data());
+	return *v;
 }
-template<class T> view<T>& matrix<T>::sub (size_t r1, size_t r2, size_t c1, size_t c2);
+
+template<class T> view<T>& matrix<T>::grid (const vector<size_t>& rows, const std::vector<size_t>& cols) {
+	assert(rows.size() > 0 && cols.size() > 0);
+	vector<size_t> cols, rows;
+	for (size_t i=0; i < rows.size(); ++i) {
+		if (rows[i] >= 0 && rows[i] < num_rows)
+			rows.push_back(rows[i]);
+		else
+			assert (1==0);
+	}
+	for (size_t i=0; i < cols.size(); ++i) {
+		if (cols[i] >= 0 && cols[i] < num_cols)
+			cols.push_back(cols[i]);
+		else
+			assert (1==0);
+	}
+	view<T> *v = new view<T>(rows.size(), cols().size(), cols, rows, data.data());
+	return *v;
+}
+template<class T> view<T>& matrix<T>::area (size_t r1, size_t r2, size_t c1, size_t c2) {
+	assert ((r1 >= 0 && r1 <= r2 && r2 < num_rows) ||
+					(r1 >= 0 && r1 < num_rows && r2 == matrix<T>::END) ||
+					(r1 == r2 && r2 == matrix<T>::END) ||
+					(c1 >= 0 && c1 <= c2 && c2 < num_cols) ||
+					(c1 >= 0 && c1 < num_cols && c2 == matrix<T>::END) ||
+					(c1 == c2 && c2 == matrix<T>::END) );
+					vector<size_t> cols, rows;
+	if (r2 == matrix<T>::END)
+		r2 = num_rows - 1;
+	if (r1 == matrix<T>::END)
+		f1 = num_rows - 1;
+	for (size_t i=r1; i <= r2; ++i)
+		rows.push_back(i);
+	if (c2 == matrix<T>::END)
+		c2 = num_cols - 1;
+		if (c1 == matrix<T>::END)
+			c1 = num_cols - 1;
+	for (size_t j=c1; j <= c2; ++j)
+		cols.push_back(j);
+	view<T> *v = new view<T>(rows.size(), cols().size(), cols, rows, data.data());
+	return *v;
+}
 #endif
