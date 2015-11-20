@@ -1,4 +1,5 @@
 #include "matrix.hpp"
+#include "matrixview.hpp"
 #include <chrono>
 
 void load_data (const char *datafile, const char *labelfile)
@@ -21,16 +22,38 @@ void load_data (const char *datafile, const char *labelfile)
 		clusters.push_back(indices);
 	}
 
-	vector<int> labels(total_points);
+	// vector<int> labels(total_points);
+	matrix<int> labels(total_points, 1);
 	for (int i=0; i < clusters.size(); ++i)
 		for (int j=0; j < clusters[i].size(); ++j)
-		{
-			labels[clusters[i][j]] = i;
-		}
+			labels(clusters[i][j], 0) = i;
 
 	// print out labels
-	for (int i=0; i < labels.size(); ++i)
-		cout << labels[i] << " ";
+	// for (int i=0; i < labels.size(); ++i)
+	// 	cout << labels[i] << " ";
+}
+
+void compute_cluster_centers (const matrix<float>& X, const matrix<int>& y) {
+	int num_classes = y.max() + 1;
+	matrix<float>* centers = new matrix<float>(num_classes, X.cols());
+	// for (int i=0; i < X.rows(); ++i) {
+		// centers->r_(i) = X.r_(y == i).mean(0);
+}
+
+void compute_coefficients (const matrix<float>& X, const matrix<int>& y, const matrix<float>& centers) {
+	int num_clusters = y.max() + 1;
+	// group data points of the same cluster into sub-matrices
+	vector<matrix<float>* > clusters;
+	// for (int i=0; i < num_clusters; ++i) {
+	// 	clusters.push_back(&(X.r_(y == i).detach()));
+	// }
+	vector<float> avg_coeffs;
+	for (int i=0; i < num_clusters; ++i) {
+		matrix<float> dist = cuda_pairwise_distance (*clusters[i]);
+		for (int j=0; j < dist.cols(); ++j) {
+
+		}
+	}
 }
 
 void test_matrix ()
@@ -41,9 +64,9 @@ void test_matrix ()
 	float array[] = {1.0, 2.0, 3.0, 4.0};
 	matrix<float> m(array, 2, 2);
 	// dump this matrix to file
-	matrix<float>::dump_matrix("test.bin", m);
+	matrix<float>::dump("test.bin", m);
 	// load the matrix again
-	matrix<float>* m2 = matrix<float>::load_matrix("test.bin", 2, 2);
+	matrix<float>* m2 = matrix<float>::load("test.bin", 2, 2);
 	// print it out
 	cout << *m2;
 	delete m2;
@@ -53,8 +76,8 @@ void test_matrix ()
 	// test number 2
 	int array2[] = {0, 0, 1, 1};
 	matrix<int> label(array2, 4, 1);
-	matrix<int>::dump_matrix("label.txt", label);
-	matrix<int>* label2 = matrix<int>::load_matrix("label.txt", 4, 1);
+	matrix<int>::dump("label.txt", label);
+	matrix<int>* label2 = matrix<int>::load("label.txt", 4, 1);
 	cout << *label2;
 	delete label2;
 
@@ -87,7 +110,7 @@ void test_matrix ()
 	cout << "b = " << b << endl;
 	cout << "max(b)=" << b.max() << endl;
 	cout << "min(b)=" << b.min() << endl;
-	cout << "mean(b)=" << b.mean() << endl;
+	cout << "sum(b)=" << b.sum() << endl;
 
 	cout << endl;
 	cout << "[Element-wise operators]" << endl;
@@ -96,16 +119,16 @@ void test_matrix ()
 	cout << "b + c = " << c.add(b) << endl;
 	cout << "b * c = " << c.mul(b) << endl;
 
-	cout << endl;
-	cout << "[OpenBLAS speedup]" << endl;
-	matrix<float> x(3000, 5000), y(5000, 2000);
-	x.fill(2); y.fill(3);
-
-	auto beg = chrono::high_resolution_clock::now();
-	fast_matrix_dot(x, y);
-	auto end = chrono::high_resolution_clock::now();
-	chrono::duration<double> dur = end - beg;
-  cout << "BLAS DOT elapsed: " << dur.count() << " seconds" << std::endl;
+	// cout << endl;
+	// cout << "[OpenBLAS speedup]" << endl;
+	// matrix<float> x(3000, 5000), y(5000, 2000);
+	// x.fill(2); y.fill(3);
+	//
+	// auto beg = chrono::high_resolution_clock::now();
+	// fast_matrix_dot(x, y);
+	// auto end = chrono::high_resolution_clock::now();
+	// chrono::duration<double> dur = end - beg;
+  // cout << "BLAS DOT elapsed: " << dur.count() << " seconds" << std::endl;
 
 	// clock_t begin2 = clock();
   // fast_matrix_dot(x, y);
@@ -115,14 +138,87 @@ void test_matrix ()
 
 	cout << endl;
 	cout << "[pairwise_distance test]" << endl;
+	matrix<float> x, y;
 	x.size(3000, 256);
 	y.size(4000, 256);
-	beg = chrono::high_resolution_clock::now();
+	auto beg = chrono::high_resolution_clock::now();
 	blas_pairwise_distance(x, y);
-	end = chrono::high_resolution_clock::now();
-	//auto dur = std::chrono::duration_cast<std::chrono::microseconds>(end - beg);
-	dur = end - beg;
+	auto end = chrono::high_resolution_clock::now();
+	auto dur = std::chrono::duration_cast<std::chrono::microseconds>(end - beg);
+	// dur = end - beg;
   cout << "BLAS PDIST elapsed: " << dur.count() << " seconds" << std::endl;
+}
+
+#define TITLE(a) (cout << endl << BOLDRED << a << RESET << endl)
+#define SHOW(txt,a) (cout << txt << "=" << endl << a << endl)
+void test_matrix2 () {
+	cout << BOLDRED << "[Arithmetic matrix]" << RESET << endl;
+	matrix<float> a(3,4), b(3,4), c;
+	a.randn(); b.randn();
+	cout << "a=" << endl << a << endl;
+	cout << "c=max(a,0)=" << endl << a.max(0) << endl;
+	cout << "c=max(a,1)=" << endl << a.max(1) << endl;
+
+	TITLE ("[Copy and References]");
+	matrix<float> d = a;
+	SHOW("d", d);
+	a(0,0) = 0.f;
+	SHOW("d", d);
+	c = d;
+	SHOW("c", c);
+	d(0,0) = -1.f;
+	SHOW("c", c);
+	d = a + b;
+	SHOW("d", d);
+	float aa[] = {1, 2, 3, 4, 5 ,6};
+	d = matrix<float>(aa, 2, 3) + matrix<float>(aa, 2, 3);
+	SHOW("d", d);
+
+	TITLE ("[Slicing and Indexing]");
+	SHOW("a", a);
+	view<float> va = a.r_(1,2);
+	SHOW("va", va);
+	view<float> va2 = a.r_(vector<size_t>({0,2}));
+	SHOW("va2", va2);
+
+	TITLE ("[Boolean operators]");
+	matrix<float> e(1,4);
+	e.randn();
+	view<float> ve = a.c_(e == e(0,1));
+	SHOW("a", a);
+	SHOW("e", e);
+	SHOW("ve==0", ve);
+	view<float> ve2 = a.c_(0,1);
+	SHOW("ve", ve2);
+
+	matrix<float> A(5, 10);
+	view<float> B = A.randn().area(1, 4, 3, 9);
+	SHOW("A", A);
+	SHOW("B", B);
+	B.fill(0.0);
+	SHOW("A", A);
+
+	TITLE ("[View and Matrix]");
+	matrix<float> C = B.detach().fill(3);
+	SHOW("C", C);
+	SHOW("A", A);
+	B.attach(C);
+	SHOW("A", A);
+
+	A.r_(0) = matrix<float>(1, A.cols()).fill(10);
+	SHOW("A", A);
+
+	TITLE("[Detach and Attach]");
+	A.size(5, 20).randn();
+	SHOW("A", A);
+	int ix[] = {0, 0, 1, 2, 2, 0, 3, 4, 4, 4, 3, 4, 2, 2, 1, 0, 0, 3, 3, 3};
+	matrix<int> y(ix, 1, 20);
+	vector<matrix<float>* > subs;
+	for (int i=0; i < 5; ++i)
+		subs.push_back(&(A.c_(y == i).detach()));
+	// print them out
+	for (int i=0; i < 5; ++i)
+		SHOW("-", *subs[i]);
 }
 
 void test_cuda() {
@@ -136,7 +232,7 @@ void test_cuda() {
 	cout << "y=" << endl << y << endl;
 
 	int dev_id = 0;
-	initialize_cuda(dev_id);
+	cuda_init(dev_id);
 	auto beg = chrono::high_resolution_clock::now();
 	cout << "z=" << endl << cuda_matrix_dot(x, y) << endl;
 	auto end = chrono::high_resolution_clock::now();
@@ -153,7 +249,7 @@ void test_cuda_pdist() {
 	// y.range(1, 6);
 	// cout << "y=" << endl << y << endl;
 	int dev_id = 0;
-	initialize_cuda(dev_id);
+	cuda_init(dev_id);
 	auto beg = chrono::high_resolution_clock::now();
 	cuda_pairwise_distance(x, y);
 	auto end = chrono::high_resolution_clock::now();
@@ -167,13 +263,13 @@ void test_cuda_pdist() {
   cout << "CuBLAS PDIST elapsed: " << dur.count() << " seconds" << std::endl;
 }
 
-void test_cluster()
-{
+void test_cluster() {
 	load_data("test.bin", "test.txt");
 }
 
 int main()
 {
 	// test_cuda();
-	test_cuda_pdist();
+	// test_cuda_pdist();
+	test_matrix2();
 }

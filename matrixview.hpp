@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <string>
+#include "matrix.hpp"
 
 using namespace std;
 
@@ -57,8 +58,8 @@ public:
 	view<T>& c_ (size_t t1, size_t t2);
 	view<T>& c_ (size_t c);
 
-	static const size_t END = -1;
-	static const size_t ALL = -2;
+	static size_t const END;
+	static size_t const ALL;
 
 	matrix<T>& detach () const;
 	view<T>& attach (const matrix<T>& mx);
@@ -74,6 +75,11 @@ public:
 	view<T>& mul (const view<T>& mx);
 };
 
+template<class T> ostream& operator<< (ostream& os, const view<T>& mx);
+
+template<class T> size_t const view<T>::END = -1;
+template<class T> size_t const view<T>::ALL = -2;
+
 template<class T> matrix<T>& operator+ (const view<T>& mx, const view<T>& mx2);
 template<class T> matrix<T>& operator- (const view<T>& mx, const view<T>& mx2);
 template<class T> matrix<T>& operator* (const view<T>& mx, const view<T>& mx2);
@@ -83,16 +89,16 @@ template<class T> matrix<T>& operator- (const view<T>& mx, const view<T>& mx2);
 template<class T> matrix<T>& operator* (const view<T>& mx, const view<T>& mx2);
 
 template<class T>
-view<T>::view (const matrix<T>* mx)
+view<T>::view (const matrix<T>& mx)
 	: num_rows(mx.rows()),
 	  num_cols(mx.cols()),
 		ptr(mx.data()),
-		stridess(mx.cols(), 1),
-		steps(mx.rows()m 1)
+		strides(mx.cols(), 1),
+		steps(mx.rows(), 1)
 	{}
 
 template<class T>
-view (size_t nrows, size_t ncols, const vector<size_t>& strides, const vector<size_t>& steps, T* p)
+view<T>::view (size_t nrows, size_t ncols, const vector<size_t>& strides, const vector<size_t>& steps, T* p)
 	: num_rows(nrows),
 	  num_cols(ncols),
 		ptr(p),
@@ -102,17 +108,17 @@ view (size_t nrows, size_t ncols, const vector<size_t>& strides, const vector<si
 
 template<class T>
 T& view<T>::operator() (size_t i, size_t j) {
-	return ptr[steps[i] * num_cols + stridess[j]];
+	return ptr[steps[i] * num_cols + strides[j]];
 }
 
 template<class T>
 T view<T>::operator() (size_t i, size_t j) const {
-	return ptr[steps[i] * num_cols + stridess[j]];
+	return ptr[steps[i] * num_cols + strides[j]];
 }
 
-template<class T> size_t view<T>::rows () { return steps.size(); }
-template<class T> size_t view<T>::cols () { return strides.size(); }
-template<class T> size_t view<T>::size () { return strides.size()*steps.size(); }
+template<class T> size_t view<T>::rows () const { return steps.size(); }
+template<class T> size_t view<T>::cols () const { return strides.size(); }
+template<class T> size_t view<T>::size () const { return strides.size()*steps.size(); }
 
 template<class  T> view<T>& view<T>::operator= (const view<T>& mx) {
 	if (this != &mx) {
@@ -236,7 +242,7 @@ template<class T> matrix<T>& view<T>::min (int axis) const {
 	}
 }
 
-template<class T> T view<T>::mean (int axis) const {
+template<class T> matrix<T>& view<T>::mean (int axis) const {
 	assert (axis == 0 || axis == 1);
 	if (axis == 0) {
 		matrix<T> *vector = new matrix<T>(1, strides.size());
@@ -259,7 +265,7 @@ template<class T> T view<T>::mean (int axis) const {
 	}
 }
 
-template<class T> T view<T>::sum () const {
+template<class T>  matrix<T>& view<T>::sum (int axis) const {
 	assert (axis == 0 || axis == 1);
 	if (axis == 0) {
 		matrix<T> *vector = new matrix<T>(1, strides.size());
@@ -290,6 +296,7 @@ template<class T> view<T>& view<T>::fill (T value) {
 }
 
 template<class T> view<T>& view<T>::range(T v1, T v2) {
+	size_t m = strides.size() * steps.size();
 	T step = (v2 - v1 + 1.0)/m;
 	size_t count = 0;
 	for (size_t i=0; i < steps.size(); ++i)
@@ -803,5 +810,19 @@ matrix<bool>&  operator<= (const matrix<T>& mx, const view<T>& mx2) {
 				ptr[ix++] = false;
 		}
 	return *index;
+}
+template<class T> ostream& operator<< (ostream& os, const view<T>& mx) {
+	os << BOLDBLUE << "[ " << RESET;
+	for (int i=0; i < mx.rows(); ++i) {
+		for (int j=0; j < mx.cols(); ++j) {
+			os << YELLOW << mx(i,j) << RESET;
+			if (j < mx.cols() - 1)
+				os << ",\t";
+		}
+		if (i < mx.rows() - 1)
+			os << "\n  ";
+	}
+	os << BOLDBLUE << " ]" << RESET;
+	return os;
 }
 #endif
