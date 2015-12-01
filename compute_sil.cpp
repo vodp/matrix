@@ -1,19 +1,47 @@
 #include "matrix.hpp"
 #include "matrixview.hpp"
+#include "alg.hpp"
+#include <functional>
+#include <cctype>
+#include <locale>
 #include <chrono>
 
-void load_data (const char *datafile, const char *labelfile)
-{
+// trim from start
+static inline std::string &ltrim(std::string &s) {
+	s.erase(s.begin(), std::find_if(s.begin(), s.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
+	return s;
+}
+
+// trim from end
+static inline std::string &rtrim(std::string &s) {
+	s.erase(std::find_if(s.rbegin(), s.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
+  return s;
+}
+
+// trim from both ends
+static inline std::string &trim(std::string &s) {
+	return ltrim(rtrim(s));
+}
+
+static inline bool do_file_exist (const std::string& name) {
+	if (FILE *file = fopen(name.c_str(), "r")) {
+        fclose(file);
+        return true;
+    } else {
+        return false;
+    }
+}
+
+matrix<int>& load_labels (const char *labelfile) {
 	vector< vector<int> > clusters;
 	ifstream file(labelfile);
 	string line;
 	size_t total_points = 0;
-	while (getline (file, line))
-	{
+	while (getline (file, line)) {
 		vector<int> indices;
+		line = trim(line);
 		stringstream ssin(line);
-		while (ssin.good())
-		{
+		while (ssin.good()) {
 			int value;
 			ssin >> value;
 			indices.push_back(value);
@@ -21,43 +49,91 @@ void load_data (const char *datafile, const char *labelfile)
 		}
 		clusters.push_back(indices);
 	}
-
-	// vector<int> labels(total_points);
-	matrix<int> labels(total_points, 1);
+	matrix<int>* labels = new matrix<int>(total_points, 1);
 	for (int i=0; i < clusters.size(); ++i)
 		for (int j=0; j < clusters[i].size(); ++j)
-			labels(clusters[i][j], 0) = i;
-
-	// print out labels
-	// for (int i=0; i < labels.size(); ++i)
-	// 	cout << labels[i] << " ";
+			(*labels)(clusters[i][j], 0) = i;
+	return *labels;
 }
 
-void compute_cluster_centers (const matrix<float>& X, const matrix<int>& y) {
+matrix<float>& compute_cluster_centers (matrix<float>& X, matrix<int>& y) {
+	assert(X.rows() == y.size());
 	int num_classes = y.max() + 1;
 	matrix<float>* centers = new matrix<float>(num_classes, X.cols());
-	// for (int i=0; i < X.rows(); ++i) {
-		// centers->r_(i) = X.r_(y == i).mean(0);
-}
-
-void compute_coefficients (const matrix<float>& X, const matrix<int>& y, const matrix<float>& centers) {
-	int num_clusters = y.max() + 1;
-	// group data points of the same cluster into sub-matrices
-	vector<matrix<float>* > clusters;
-	// for (int i=0; i < num_clusters; ++i) {
-	// 	clusters.push_back(&(X.r_(y == i).detach()));
-	// }
-	vector<float> avg_coeffs;
-	for (int i=0; i < num_clusters; ++i) {
-		matrix<float> dist = cuda_pairwise_distance (*clusters[i]);
-		for (int j=0; j < dist.cols(); ++j) {
-
-		}
+	size_t m = X.rows();
+	#pragma omp parallel for
+	for (int i=0; i < num_classes; ++i) {
+		centers->r_(i) = X.r_(y == i).mean(0);
 	}
+	return *centers;
+}
+matrix<float>& compute_coefficients (matrix<float>& X, matrix<int>& y, matrix<float>& centers) {
+	int num_clusters = y.max() + 1;
+	// copy original data into submatrices to avoid further computational cost
+	vector<matrix<float>* > clusters;
+	for (int i=0; i < num_clusters; ++i) {
+		clusters.push_back(&(X.r_(y == i).detach()));
+	}
+	matrix<float> *avg_coeffs = new matrix<float>(1, num_clusters);
+	for (int i=0; i < num_clusters; ++i) {
+		matrix<float> intra_dist = cuda_pairwise_distance (*clusters[i]);
+		matrix<float> inter_dist = cuda_pairwise_distance (*clusters[i], centers);
+		matrix<size_t> sorted_ix = matrix_argsort(inter_dist, matrix<size_t>::DIM_HORIZONTAL);
+
+		matrix<size_t> nearest_clusters(1, sorted_ix.size());
+		for (int j=0; j < sorted_ix.rows(); ++j) {
+			if (sorted_ix(j,0) != i)
+				nearest_clusters(0,j) = sorted_ix(j, 0);
+			else
+				nearest_clusters(0,j) = sorted_ix(j, 1);
+		}
+		// group points having common nearest clusters and compute silhouette coefficients
+		int count = 0;
+		matrix<float> coeffs(1, nearest_clusters.size());
+		vector<size_t> unique_nearest_clusters(nearest_clusters.ptr(), nearest_clusters.ptr() + nearest_clusters.size());
+		std::sort (unique_nearest_clusters.begin(), unique_nearest_clusters.end());
+		vector<size_t>::iterator it = std::unique (unique_nearest_clusters.begin(), unique_nearest_clusters.end());
+		unique_nearest_clusters.resize(std::distance(unique_nearest_clusters.begin(), it) );
+		for (size_t k=0; k < unique_nearest_clusters.size(); ++k) {
+			matrix<unsigned char> bool_ix = nearest_clusters == unique_nearest_clusters[k];
+			matrix<float> mean_a = intra_dist.r_(bool_ix).mean(1);
+			matrix<float> vecs = (*clusters[i]).r_(bool_ix).detach();
+			matrix<float> mean_b = cuda_pairwise_distance(vecs, *clusters[unique_nearest_clusters[k]]).mean(1);
+			assert(mean_a.rows() == mean_b.rows());
+			for (int j=0; j < mean_a.rows(); ++j) {
+				float coeff = (mean_b(j,0) - mean_a(j,0))/std::max(mean_b(j,0), mean_a(j,0));
+				coeffs(0, count) = coeff;
+			}
+		}
+		(*avg_coeffs)(0, i) = coeffs.sum()/coeffs.size();
+		cout << "coefficient #" << i << ": " << (*avg_coeffs)(0,i) << endl;
+	}
+	return (*avg_coeffs);
+}
+void csil () {
+	cout << "Loading features...";
+	matrix<float> X = matrix<float>::load("../dat/20m_signatures_random.caffe.256", 18389592, 256);
+	X = X.c_(0, 16).detach();
+	cout << "has dimension (" << X.rows() << ", " << X.cols() << ")" << endl;
+	cout << "Loading labels...";
+	matrix<int> y = load_labels("../dat/cluster_20msig_5kcenter_random.lst");
+	cout << "has dimension (" << y.rows() << ", " << y.cols() << ")" << endl;
+	matrix<float> centers;
+	if (do_file_exist(string("../dat/centers.16"))) {
+		centers = matrix<float>::load("../dat/centers.16", 5000, 16);
+	} else {
+		cout << "Computing cluster centers..." << endl;
+		centers = compute_cluster_centers (X, y);
+		cout << "Saving cluster centers...";
+		matrix<float>::dump("../dat/centers.16", centers);
+	}
+	cout << "Computing Silhouette coefficients..." << endl;
+	matrix<float> coeffs = compute_coefficients (X, y, centers);
+	matrix<float>::dump("../dat/coeffs.bin", coeffs);
+	cout << "Dumped results to ../dat/coeffs.bin. DONE.";
 }
 
-void test_matrix ()
-{
+void test_matrix () {
 	// create a sample matrix
 	cout << "\n";
 	cout << "[Serialization test]" << endl;
@@ -66,10 +142,9 @@ void test_matrix ()
 	// dump this matrix to file
 	matrix<float>::dump("test.bin", m);
 	// load the matrix again
-	matrix<float>* m2 = matrix<float>::load("test.bin", 2, 2);
+	matrix<float> m2 = matrix<float>::load("test.bin", 2, 2);
 	// print it out
-	cout << *m2;
-	delete m2;
+	cout << m2;
 
 	cout << "\n";
 	cout << "[Print test]" << endl;
@@ -77,9 +152,8 @@ void test_matrix ()
 	int array2[] = {0, 0, 1, 1};
 	matrix<int> label(array2, 4, 1);
 	matrix<int>::dump("label.txt", label);
-	matrix<int>* label2 = matrix<int>::load("label.txt", 4, 1);
-	cout << *label2;
-	delete label2;
+	matrix<int> label2 = matrix<int>::load("label.txt", 4, 1);
+	cout << label2;
 
 	cout << "\n";
 	cout << "[Arithmetic operators]" << endl;
@@ -221,6 +295,49 @@ void test_matrix2 () {
 		SHOW("-", *subs[i]);
 }
 
+void test_sorting () {
+	matrix<float> A(4, 4);
+	A.randn();
+	TITLE("[Sorting test]");
+	SHOW("A", A);
+	matrix<float> B = matrix_sort (A, matrix<float>::SORT_ROWS, matrix<float>::SORT_ASCEND);
+	SHOW("sort(A, row)", B);
+	matrix<size_t> C = matrix_argsort (A, matrix<float>::SORT_ROWS, matrix<float>::SORT_ASCEND);
+	SHOW("arg(A, row)", C);
+
+	B = matrix_sort (A, matrix<float>::SORT_COLS, matrix<float>::SORT_ASCEND);
+	SHOW("sort(A, col)", B);
+	C = matrix_argsort (A, matrix<float>::SORT_COLS, matrix<float>::SORT_ASCEND);
+	SHOW("arg(A, col)", C);
+
+	B = matrix_sort (A, matrix<float>::SORT_ROWS, matrix<float>::SORT_DESCEND);
+	SHOW("sort(B, row, desc)", B);
+	C = matrix_argsort (A, matrix<float>::SORT_ROWS, matrix<float>::SORT_DESCEND);
+	SHOW("arg(B, row, desc)", C);
+
+	B = matrix_sort (A, matrix<float>::SORT_COLS, matrix<float>::SORT_DESCEND);
+	SHOW("sort(B, col, desc)", B);
+	C = matrix_argsort (A, matrix<float>::SORT_COLS, matrix<float>::SORT_DESCEND);
+	SHOW("arg(B, col, desc)", C);
+
+	view<float> a = A.area(0, 2, 0, 2);
+	SHOW("a", a);
+	matrix<float> b = matrix_sort (a, matrix<float>::SORT_ROWS, matrix<float>::SORT_ASCEND);
+	SHOW("sort(a, row, asc)", b);
+	matrix<size_t> c = matrix_argsort (a, matrix<float>::SORT_ROWS, matrix<float>::SORT_ASCEND);
+	SHOW("arg(a, row, asc)", c);
+
+	b = matrix_sort (a, matrix<float>::SORT_COLS, matrix<float>::SORT_ASCEND);
+	SHOW("sort(a, row, asc)", b);
+	c = matrix_argsort (a, matrix<float>::SORT_COLS, matrix<float>::SORT_ASCEND);
+	SHOW("arg(a, row, asc)", c);
+
+	b = matrix_sort (a, matrix<float>::SORT_ROWS, matrix<float>::SORT_DESCEND);
+	SHOW("sort(a, row, des)", b);
+	c = matrix_argsort (a, matrix<float>::SORT_ROWS, matrix<float>::SORT_DESCEND);
+	SHOW("arg(a, row, des)", c);
+}
+
 void test_cuda() {
 	cout << endl;
 	cout << "[CuBLAS test]" << endl;
@@ -263,13 +380,11 @@ void test_cuda_pdist() {
   cout << "CuBLAS PDIST elapsed: " << dur.count() << " seconds" << std::endl;
 }
 
-void test_cluster() {
-	load_data("test.bin", "test.txt");
-}
-
 int main()
 {
 	// test_cuda();
 	// test_cuda_pdist();
-	test_matrix2();
+	// test_matrix2();
+	// test_sorting();
+	csil();
 }

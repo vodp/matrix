@@ -401,8 +401,7 @@ template<class T> view<T>& view<T>::c_ (size_t c) {
 }
 
 template<class T> matrix<T>& view<T>::detach () const {
-	assert (num_rows >=0 && num_cols >=0 && ptr != NULL &&
-					strides.size() >= 0 && steps.size() >=0);
+	assert (ptr != NULL && strides.size() > 0 && steps.size() > 0);
 	matrix<T> *mx = new matrix<T>(steps.size(), strides.size());
 	T *p = mx->mutable_ptr();
 	size_t ix = 0;

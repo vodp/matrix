@@ -59,9 +59,9 @@
 matrix<float>& blas_pairwise_distance (const matrix<float>& A, const matrix<float>& B) {
 	assert(A.cols() == B.cols());
 
-	int M = A.rows();
-	int N = B.rows();
-	int K = B.cols();
+	size_t M = A.rows();
+	size_t N = B.rows();
+	size_t K = B.cols();
 	matrix<float> *C = new matrix<float>(M, N);
   float alpha = 1.0, beta = 0.0;
   int lda = A.cols(), ldb = B.cols(), ldc = C->cols();
