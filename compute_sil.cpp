@@ -6,30 +6,29 @@
 #include <locale>
 #include <chrono>
 
+#define TITLE(a) (cout << endl << BOLDRED << a << RESET << endl)
+#define SHOW(txt,a) (cout << txt << "=" << endl << a << endl)
+
 // trim from start
 static inline std::string &ltrim(std::string &s) {
 	s.erase(s.begin(), std::find_if(s.begin(), s.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
 	return s;
 }
-
 // trim from end
 static inline std::string &rtrim(std::string &s) {
 	s.erase(std::find_if(s.rbegin(), s.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
   return s;
 }
-
 // trim from both ends
 static inline std::string &trim(std::string &s) {
 	return ltrim(rtrim(s));
 }
-
 static inline bool do_file_exist (const std::string& name) {
 	if (FILE *file = fopen(name.c_str(), "r")) {
         fclose(file);
         return true;
-    } else {
+    } else
         return false;
-    }
 }
 
 matrix<int>& load_labels (const char *labelfile) {
@@ -61,8 +60,8 @@ matrix<float>& compute_cluster_centers (matrix<float>& X, matrix<int>& y) {
 	int num_classes = y.max() + 1;
 	matrix<float>* centers = new matrix<float>(num_classes, X.cols());
 	size_t m = X.rows();
-	#pragma omp parallel for
 	for (int i=0; i < num_classes; ++i) {
+		// cout << "computing cluster center #" << i << endl;
 		centers->r_(i) = X.r_(y == i).mean(0);
 	}
 	return *centers;
@@ -70,17 +69,21 @@ matrix<float>& compute_cluster_centers (matrix<float>& X, matrix<int>& y) {
 matrix<float>& compute_coefficients (matrix<float>& X, matrix<int>& y, matrix<float>& centers) {
 	int num_clusters = y.max() + 1;
 	// copy original data into submatrices to avoid further computational cost
-	vector<matrix<float>* > clusters;
-	for (int i=0; i < num_clusters; ++i) {
-		clusters.push_back(&(X.r_(y == i).detach()));
-	}
+	// vector<matrix<float>* > clusters;
+	// cout << "Grouping cluster data..." << endl;
+	// for (int i=0; i < num_clusters; ++i) {
+	// 	clusters.push_back(&(X.r_(y == i).detach()));
+	// }
+	// delete &X;
 	matrix<float> *avg_coeffs = new matrix<float>(1, num_clusters);
 	for (int i=0; i < num_clusters; ++i) {
-		matrix<float> intra_dist = cuda_pairwise_distance (*clusters[i]);
-		matrix<float> inter_dist = cuda_pairwise_distance (*clusters[i], centers);
-		matrix<size_t> sorted_ix = matrix_argsort(inter_dist, matrix<size_t>::DIM_HORIZONTAL);
-
-		matrix<size_t> nearest_clusters(1, sorted_ix.size());
+		cout << "Computing cluster #" << i << "..." << endl;
+		matrix<unsigned char>& ixx = y == i;
+		view<float>& cluster_view = X.r_(y == i);
+		matrix<float>& thiscluster = cluster_view.detach();
+		matrix<float>& inter_dist = cuda_pairwise_distance (thiscluster, centers);
+		matrix<size_t>& sorted_ix = matrix_argsort(inter_dist, matrix<size_t>::SORT_ROWS);
+		matrix<size_t> nearest_clusters(1, thiscluster.rows());
 		for (int j=0; j < sorted_ix.rows(); ++j) {
 			if (sorted_ix(j,0) != i)
 				nearest_clusters(0,j) = sorted_ix(j, 0);
@@ -88,43 +91,95 @@ matrix<float>& compute_coefficients (matrix<float>& X, matrix<int>& y, matrix<fl
 				nearest_clusters(0,j) = sorted_ix(j, 1);
 		}
 		// group points having common nearest clusters and compute silhouette coefficients
-		int count = 0;
-		matrix<float> coeffs(1, nearest_clusters.size());
 		vector<size_t> unique_nearest_clusters(nearest_clusters.ptr(), nearest_clusters.ptr() + nearest_clusters.size());
 		std::sort (unique_nearest_clusters.begin(), unique_nearest_clusters.end());
 		vector<size_t>::iterator it = std::unique (unique_nearest_clusters.begin(), unique_nearest_clusters.end());
 		unique_nearest_clusters.resize(std::distance(unique_nearest_clusters.begin(), it) );
+
+		int count = 0;
+		matrix<float>& intra_dist = cuda_pairwise_distance (thiscluster);
+		matrix<float> coeffs(1, nearest_clusters.size());
+
 		for (size_t k=0; k < unique_nearest_clusters.size(); ++k) {
-			matrix<unsigned char> bool_ix = nearest_clusters == unique_nearest_clusters[k];
-			matrix<float> mean_a = intra_dist.r_(bool_ix).mean(1);
-			matrix<float> vecs = (*clusters[i]).r_(bool_ix).detach();
-			matrix<float> mean_b = cuda_pairwise_distance(vecs, *clusters[unique_nearest_clusters[k]]).mean(1);
-			assert(mean_a.rows() == mean_b.rows());
+			size_t next_cluster = unique_nearest_clusters[k];
+			matrix<unsigned char>& ix = y == (int)next_cluster;
+			view<float>& subview = X.r_(ix);
+			matrix<float>& subcluster = subview.detach();
+
+			matrix<unsigned char>& bool_ix = nearest_clusters == next_cluster;
+			matrix<float>& vecs = thiscluster.r_(bool_ix).detach();
+			matrix<float>& subinter = cuda_pairwise_distance(vecs, subcluster);
+			matrix<float>& mean_b = subinter.mean(1);
+			view<float>& subintra = intra_dist.r_(bool_ix);
+			matrix<float>& mean_a = subintra.mean(1);
+			assert(mean_a.size() == mean_b.size() && vecs.rows() == mean_a.size());
 			for (int j=0; j < mean_a.rows(); ++j) {
 				float coeff = (mean_b(j,0) - mean_a(j,0))/std::max(mean_b(j,0), mean_a(j,0));
-				coeffs(0, count) = coeff;
+				coeffs(0, count++) = coeff;
 			}
+			delete &subcluster;
+			delete &bool_ix;
+			delete &vecs;
+			delete &mean_b;
+			delete &mean_a;
+			delete &ix;
+			delete &subview;
+			delete &subinter;
+			delete &subintra;
 		}
-		(*avg_coeffs)(0, i) = coeffs.sum()/coeffs.size();
+		assert(count == coeffs.size());
+		(*avg_coeffs)(0, i) = coeffs.mean();
 		cout << "coefficient #" << i << ": " << (*avg_coeffs)(0,i) << endl;
+		delete &thiscluster;
+		delete &intra_dist;
+		delete &inter_dist;
+		delete &sorted_ix;
+		delete &cluster_view;
+		delete &ixx;
 	}
 	return (*avg_coeffs);
 }
 void csil () {
-	cout << "Loading features...";
+	cout << "Loading features..." << endl;
 	matrix<float> X = matrix<float>::load("../dat/20m_signatures_random.caffe.256", 18389592, 256);
 	X = X.c_(0, 16).detach();
-	cout << "has dimension (" << X.rows() << ", " << X.cols() << ")" << endl;
-	cout << "Loading labels...";
+	cout << "...has dimension (" << X.rows() << ", " << X.cols() << ")" << endl;
+	cout << "Loading labels..." << endl;
 	matrix<int> y = load_labels("../dat/cluster_20msig_5kcenter_random.lst");
-	cout << "has dimension (" << y.rows() << ", " << y.cols() << ")" << endl;
+	cout << "...has dimension (" << y.rows() << ", " << y.cols() << ")" << endl;
+	view<int> yy = y.r_(std::vector<size_t>({5176, 10577, 10940, 11167, 15510, 15914}));
+	SHOW("y[:6]", yy);
 	matrix<float> centers;
 	if (do_file_exist(string("../dat/centers.16"))) {
+		cout << "Loading centers..." << endl;
 		centers = matrix<float>::load("../dat/centers.16", 5000, 16);
 	} else {
 		cout << "Computing cluster centers..." << endl;
 		centers = compute_cluster_centers (X, y);
-		cout << "Saving cluster centers...";
+		cout << "Saving cluster centers..." << endl;
+		matrix<float>::dump("../dat/centers.16", centers);
+	}
+	cout << "Computing Silhouette coefficients..." << endl;
+	matrix<float> coeffs = compute_coefficients (X, y, centers);
+	matrix<float>::dump("../dat/coeffs.bin", coeffs);
+	cout << "Dumped results to ../dat/coeffs.bin. DONE.";
+}
+
+void csil_sanitycheck () {
+	cout << "Loading features..." << endl;
+	matrix<float> X = matrix<float>::load("../dat/MNIST.dat", 10000, 5);
+	cout << "...has dimension (" << X.rows() << ", " << X.cols() << ")" << endl;
+	cout << "Loading labels..." << endl;
+	matrix<int> y = matrix<int>::load("../dat/MNIST.label", 10000, 1);
+	cout << "...has dimension (" << y.rows() << ", " << y.cols() << ")" << endl;
+	matrix<float> centers;
+	if (do_file_exist(string("../dat/centers.5"))) {
+		cout << "Loading centers..." << endl;
+		centers = matrix<float>::load("../dat/centers.5", 10, 5);
+	} else {
+		cout << "Computing cluster centers..." << endl;
+		centers = compute_cluster_centers (X, y);
+		cout << "Saving cluster centers..." << endl;
 		matrix<float>::dump("../dat/centers.16", centers);
 	}
 	cout << "Computing Silhouette coefficients..." << endl;
@@ -223,8 +278,7 @@ void test_matrix () {
   cout << "BLAS PDIST elapsed: " << dur.count() << " seconds" << std::endl;
 }
 
-#define TITLE(a) (cout << endl << BOLDRED << a << RESET << endl)
-#define SHOW(txt,a) (cout << txt << "=" << endl << a << endl)
+
 void test_matrix2 () {
 	cout << BOLDRED << "[Arithmetic matrix]" << RESET << endl;
 	matrix<float> a(3,4), b(3,4), c;
@@ -380,6 +434,23 @@ void test_cuda_pdist() {
   cout << "CuBLAS PDIST elapsed: " << dur.count() << " seconds" << std::endl;
 }
 
+void test_detach() {
+	matrix<float> A(5,7);
+	A.randn();
+	SHOW("A", A);
+	int ix[] = {0, 0, 1, 1, 2};
+	matrix<int> y(ix, 1,5);
+	SHOW("y", y);
+	view<float> a = A.r_(y == 0);
+	SHOW("a", a);
+	matrix<unsigned char> duma = y == 0;
+	SHOW("y == 0", duma);
+	matrix<float> B = a.detach();
+	SHOW("B", B);
+	// matrix<float>C = B.r_(2,3).detach();
+	// SHOW("C", C);
+}
+
 int main()
 {
 	// test_cuda();
@@ -387,4 +458,6 @@ int main()
 	// test_matrix2();
 	// test_sorting();
 	csil();
+	// csil_sanitycheck();
+	// test_detach();
 }

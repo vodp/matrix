@@ -17,6 +17,7 @@ private:
 
 public:
 	view (const matrix<T>& mx);
+	~view ();
 	view (size_t nrows, size_t ncols, const vector<size_t>& strides, const vector<size_t>& steps, T* ptr);
 	T& operator() (size_t i, size_t j);
 	T operator() (size_t i, size_t j) const;
@@ -49,19 +50,19 @@ public:
 
 	// slicing
 	view<T>& r_ (const vector<size_t>& rows);
-	view<T>& r_ (const matrix<bool>& rows);
+	view<T>& r_ (const matrix<unsigned char>& rows);
 	view<T>& r_ (size_t r1, size_t r2);
 	view<T>& r_ (size_t r);
 
 	view<T>& c_ (const vector<size_t>& cols);
-	view<T>& c_ (const matrix<bool>& cols);
+	view<T>& c_ (const matrix<unsigned char>& cols);
 	view<T>& c_ (size_t t1, size_t t2);
 	view<T>& c_ (size_t c);
 
 	static size_t const END;
 	static size_t const ALL;
 
-	matrix<T>& detach () const;
+	matrix<T>& detach ();
 	view<T>& attach (const matrix<T>& mx);
 
 	// assignment operator
@@ -98,14 +99,17 @@ view<T>::view (const matrix<T>& mx)
 	{}
 
 template<class T>
-view<T>::view (size_t nrows, size_t ncols, const vector<size_t>& strides, const vector<size_t>& steps, T* p)
+view<T>::view (size_t nrows, size_t ncols, const vector<size_t>& strides_, const vector<size_t>& steps_, T* p)
 	: num_rows(nrows),
 	  num_cols(ncols),
 		ptr(p),
-		strides(strides),
-		steps(steps)
+		strides(strides_),
+		steps(steps_)
 	{}
-
+template<class T> view<T>::~view() {
+	strides.clear();
+	steps.clear();
+}
 template<class T>
 T& view<T>::operator() (size_t i, size_t j) {
 	return ptr[steps[i] * num_cols + strides[j]];
@@ -123,16 +127,22 @@ template<class T> size_t view<T>::size () const { return strides.size()*steps.si
 template<class  T> view<T>& view<T>::operator= (const view<T>& mx) {
 	if (this != &mx) {
 		assert(strides.size() == mx.cols() && steps.size() == mx.rows());
-		for (size_t i=0; i < steps.size(); ++i)
-			for (size_t j=0; j < strides.size(); ++j)
+		size_t m = steps.size();
+		size_t n = strides.size();
+		#pragma omp parallel for
+		for (size_t i=0; i < m; ++i)
+			for (size_t j=0; j < n; ++j)
 				ptr[steps[i]*num_cols + strides[j]] = mx(i,j);
 	}
 	return *this;
 }
 template<class T> view<T>& view<T>::operator= (const matrix<T>& mx) {
 	assert (strides.size() == mx.cols() && steps.size() == mx.rows());
-	for (size_t i=0; i < steps.size(); ++i)
-		for (size_t j=0; j < strides.size(); ++j)
+	size_t m = steps.size();
+	size_t n = strides.size();
+	#pragma omp parallel for
+	for (size_t i=0; i < m; ++i)
+		for (size_t j=0; j < n; ++j)
 			ptr[steps[i]*num_cols + strides[j]] = mx(i, j);
 	return *this;
 }
@@ -178,10 +188,13 @@ template<class T> T view<T>::min () const {
 
 template<class T> T view<T>::mean () const {
 	T mean = 0.0;
-	for (size_t i=0; i < steps.size(); ++i)
-		for (size_t j=0; j< strides.size(); ++j)
+	size_t m = steps.size();
+	size_t n = strides.size();
+	#pragma omp parallel for
+	for (size_t i=0; i < m; ++i)
+		for (size_t j=0; j< n; ++j)
 			mean += ptr[steps[i]*num_cols + strides[j]];
-	mean /= (strides.size()*steps.size());
+	mean /= (m*n);
 	return mean;
 }
 
@@ -244,22 +257,26 @@ template<class T> matrix<T>& view<T>::min (int axis) const {
 
 template<class T> matrix<T>& view<T>::mean (int axis) const {
 	assert (axis == 0 || axis == 1);
+	size_t m = strides.size();
+	size_t n = steps.size();
 	if (axis == 0) {
-		matrix<T> *vector = new matrix<T>(1, strides.size());
-		for (size_t j=0; j < strides.size(); ++j) {
+		matrix<T> *vector = new matrix<T>(1, m);
+		// #pragma omp parallel for
+		for (size_t j=0; j < m; ++j) {
 			T mean = 0.0;
-			for (size_t i=0; i < steps.size(); ++j)
+			for (size_t i=0; i < n; ++i)
 				mean += ptr[steps[i]*num_cols + strides[j]];
-			(*vector)(0, j) = mean / strides.size();
+			(*vector)(0, j) = mean / n;
 		}
 		return *vector;
 	} else {
-		matrix<T> *vector = new matrix<T>(steps.size(), 1);
-		for (size_t i=0; i < steps.size(); ++i) {
+		matrix<T> *vector = new matrix<T>(n, 1);
+		// #pragma omp parallel for
+		for (size_t i=0; i < n; ++i) {
 			T mean = 0.0;
-			for (size_t j=0; j < strides.size(); ++j)
+			for (size_t j=0; j < m; ++j)
 				mean += ptr[steps[i]*num_cols + strides[j]];
-			(*vector)(i, 0) = mean / steps.size();
+			(*vector)(i, 0) = mean / m;
 		}
 		return *vector;
 	}
@@ -324,13 +341,14 @@ template<class T> view<T>& view<T>::r_ (const vector<size_t>& rows) {
 	view<T> *subview = new view<T>(rows.size(), num_cols, strides, subrows, ptr);
 	return *subview;
 }
-template<class T> view<T>& view<T>::r_ (const matrix<bool>& rows) {
+template<class T> view<T>& view<T>::r_ (const matrix<unsigned char>& rows) {
 	assert(rows.rows() == 1 && rows.cols() == strides.size());
 	vector<size_t> subrows;
 	for (size_t i=0; i < rows.rows(); ++i)
-		if (rows(0, i) == true)
+		if (rows(0, i) == 1)
 			subrows.push_back(steps[i]);
 	view<T> *subview = new view<T>(rows.rows(), num_cols, strides, subrows, ptr);
+	cout << "done" << endl;
 	return *subview;
 }
 template<class T> view<T>& view<T>::r_ (size_t r1, size_t r2) {
@@ -367,11 +385,11 @@ template<class T> view<T>& view<T>::c_ (const vector<size_t>& cols) {
 	view<T> *subview = new view<T>(num_rows, cols.size(), subcols, steps, ptr);
 	return *subview;
 }
-template<class T> view<T>& view<T>::c_ (const matrix<bool>& cols) {
+template<class T> view<T>& view<T>::c_ (const matrix<unsigned char>& cols) {
 	assert(cols.cols() == 1 && cols.cols() == strides.size());
 	vector<size_t> subcols;
 	for (size_t i=0; i < cols.cols(); ++i)
-		if (cols(i, 0) == true)
+		if (cols(i, 0) == 1)
 			subcols.push_back(strides[i]);
 	view<T> *subview = new view<T>(num_rows, cols.cols(), subcols, steps, ptr);
 	return *subview;
@@ -400,7 +418,7 @@ template<class T> view<T>& view<T>::c_ (size_t c) {
 	return *subview;
 }
 
-template<class T> matrix<T>& view<T>::detach () const {
+template<class T> matrix<T>& view<T>::detach () {
 	assert (ptr != NULL && strides.size() > 0 && steps.size() > 0);
 	matrix<T> *mx = new matrix<T>(steps.size(), strides.size());
 	T *p = mx->mutable_ptr();
@@ -454,359 +472,359 @@ template<class T> view<T>& view<T>::mul (const view<T>& mx) {
 }
 
 template<class T>
-matrix<bool>&  operator== (const view<T>& mx, const T value) {
-	matrix<bool> *index = new matrix<bool>(mx.rows(), mx.cols());
+matrix<unsigned char>&  operator== (const view<T>& mx, const T value) {
+	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
 	T *ptr = index->mutable_ptr();
 	size_t ix = 0;
 	for (size_t i=0; i < mx.rows(); ++i)
 		for (size_t j=0; j < mx.cols(); ++j) {
 			if (mx(i, j) == value)
-				ptr[ix++] = true;
+				ptr[ix++] = 1;
 			else
-				ptr[ix++] = false;
+				ptr[ix++] = 0;
 		}
 	return *index;
 }
 template<class T>
-matrix<bool>&  operator!= (const view<T>& mx, const T value) {
-	matrix<bool> *index = new matrix<bool>(mx.rows(), mx.cols());
+matrix<unsigned char>&  operator!= (const view<T>& mx, const T value) {
+	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
 	T *ptr = index->mutable_ptr();
 	size_t ix = 0;
 	for (size_t i=0; i < mx.rows(); ++i)
 		for (size_t j=0; j < mx.cols(); ++j) {
 			if (mx(i, j) != value)
-				ptr[ix++] = true;
+				ptr[ix++] = 1;
 			else
-				ptr[ix++] = false;
+				ptr[ix++] = 0;
 		}
 	return *index;
 }
 template<class T>
-matrix<bool>&  operator> (const view<T>& mx, const T value) {
-	matrix<bool> *index = new matrix<bool>(mx.rows(), mx.cols());
+matrix<unsigned char>&  operator> (const view<T>& mx, const T value) {
+	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
 	T *ptr = index->mutable_ptr();
 	size_t ix = 0;
 	for (size_t i=0; i < mx.rows(); ++i)
 		for (size_t j=0; j < mx.cols(); ++j) {
 			if (mx(i, j) > value)
-				ptr[ix++] = true;
+				ptr[ix++] = 1;
 			else
-				ptr[ix++] = false;
+				ptr[ix++] = 0;
 		}
 	return *index;
 }
 template<class T>
-matrix<bool>&  operator>= (const view<T>& mx, const T value) {
-	matrix<bool> *index = new matrix<bool>(mx.rows(), mx.cols());
+matrix<unsigned char>&  operator>= (const view<T>& mx, const T value) {
+	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
 	T *ptr = index->mutable_ptr();
 	size_t ix = 0;
 	for (size_t i=0; i < mx.rows(); ++i)
 		for (size_t j=0; j < mx.cols(); ++j) {
 			if (mx(i, j) >= value)
-				ptr[ix++] = true;
+				ptr[ix++] = 1;
 			else
-				ptr[ix++] = false;
+				ptr[ix++] = 0;
 		}
 	return *index;
 }
 template<class T>
-matrix<bool>&  operator< (const view<T>& mx, const T value) {
-	matrix<bool> *index = new matrix<bool>(mx.rows(), mx.cols());
+matrix<unsigned char>&  operator< (const view<T>& mx, const T value) {
+	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
 	T *ptr = index->mutable_ptr();
 	size_t ix = 0;
 	for (size_t i=0; i < mx.rows(); ++i)
 		for (size_t j=0; j < mx.cols(); ++j) {
 			if (mx(i, j) < value)
-				ptr[ix++] = true;
+				ptr[ix++] = 1;
 			else
-				ptr[ix++] = false;
+				ptr[ix++] = 0;
 		}
 	return *index;
 }
 template<class T>
-matrix<bool>&  operator<= (const view<T>& mx, const T value) {
-	matrix<bool> *index = new matrix<bool>(mx.rows(), mx.cols());
+matrix<unsigned char>&  operator<= (const view<T>& mx, const T value) {
+	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
 	T *ptr = index->mutable_ptr();
 	size_t ix = 0;
 	for (size_t i=0; i < mx.rows(); ++i)
 		for (size_t j=0; j < mx.cols(); ++j) {
 			if (mx(i, j) <= value)
-				ptr[ix++] = true;
+				ptr[ix++] = 1;
 			else
-				ptr[ix++] = false;
+				ptr[ix++] = 0;
 		}
 	return *index;
 }
 
 template<class T>
-matrix<bool>&  operator== (const view<T>& mx, const view<T>& mx2) {
+matrix<unsigned char>&  operator== (const view<T>& mx, const view<T>& mx2) {
 	assert(mx.rows() == mx2.rows() && mx.cols() == mx2.cols());
-	matrix<bool> *index = new matrix<bool>(mx.rows(), mx.cols());
+	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
 	T *ptr = index->mutable_ptr();
 	size_t ix = 0;
 	for (size_t i=0; i < mx.rows(); ++i)
 		for (size_t j=0; j < mx.cols(); ++j) {
 			if (mx(i, j) == mx2(i, j))
-				ptr[ix++] = true;
+				ptr[ix++] = 1;
 			else
-				ptr[ix++] = false;
+				ptr[ix++] = 0;
 		}
 	return *index;
 }
 template<class T>
-matrix<bool>&  operator!= (const view<T>& mx, const view<T>& mx2) {
+matrix<unsigned char>&  operator!= (const view<T>& mx, const view<T>& mx2) {
 	assert(mx.rows() == mx2.rows() && mx.cols() == mx2.cols());
-	matrix<bool> *index = new matrix<bool>(mx.rows(), mx.cols());
+	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
 	T *ptr = index->mutable_ptr();
 	size_t ix = 0;
 	for (size_t i=0; i < mx.rows(); ++i)
 		for (size_t j=0; j < mx.cols(); ++j) {
 			if (mx(i, j) != mx2(i, j))
-				ptr[ix++] = true;
+				ptr[ix++] = 1;
 			else
-				ptr[ix++] = false;
+				ptr[ix++] = 0;
 		}
 	return *index;
 }
 template<class T>
-matrix<bool>&  operator> (const view<T>& mx, const view<T>& mx2) {
+matrix<unsigned char>&  operator> (const view<T>& mx, const view<T>& mx2) {
 	assert(mx.rows() == mx2.rows() && mx.cols() == mx2.cols());
-	matrix<bool> *index = new matrix<bool>(mx.rows(), mx.cols());
+	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
 	T *ptr = index->mutable_ptr();
 	size_t ix = 0;
 	for (size_t i=0; i < mx.rows(); ++i)
 		for (size_t j=0; j < mx.cols(); ++j) {
 			if (mx(i, j) > mx2(i, j))
-				ptr[ix++] = true;
+				ptr[ix++] = 1;
 			else
-				ptr[ix++] = false;
+				ptr[ix++] = 0;
 		}
 	return *index;
 }
 template<class T>
-matrix<bool>&  operator>= (const view<T>& mx, const view<T>& mx2) {
+matrix<unsigned char>&  operator>= (const view<T>& mx, const view<T>& mx2) {
 	assert(mx.rows() == mx2.rows() && mx.cols() == mx2.cols());
-	matrix<bool> *index = new matrix<bool>(mx.rows(), mx.cols());
+	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
 	T *ptr = index->mutable_ptr();
 	size_t ix = 0;
 	for (size_t i=0; i < mx.rows(); ++i)
 		for (size_t j=0; j < mx.cols(); ++j) {
 			if (mx(i, j) >= mx2(i, j))
-				ptr[ix++] = true;
+				ptr[ix++] = 1;
 			else
-				ptr[ix++] = false;
+				ptr[ix++] = 0;
 		}
 	return *index;
 }
 template<class T>
-matrix<bool>&  operator< (const view<T>& mx, const view<T>& mx2) {
+matrix<unsigned char>&  operator< (const view<T>& mx, const view<T>& mx2) {
 	assert(mx.rows() == mx2.rows() && mx.cols() == mx2.cols());
-	matrix<bool> *index = new matrix<bool>(mx.rows(), mx.cols());
+	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
 	T *ptr = index->mutable_ptr();
 	size_t ix = 0;
 	for (size_t i=0; i < mx.rows(); ++i)
 		for (size_t j=0; j < mx.cols(); ++j) {
 			if (mx(i, j) < mx2(i, j))
-				ptr[ix++] = true;
+				ptr[ix++] = 1;
 			else
-				ptr[ix++] = false;
+				ptr[ix++] = 0;
 		}
 	return *index;
 }
 template<class T>
-matrix<bool>&  operator<= (const view<T>& mx, const view<T>& mx2) {
+matrix<unsigned char>&  operator<= (const view<T>& mx, const view<T>& mx2) {
 	assert(mx.rows() == mx2.rows() && mx.cols() == mx2.cols());
-	matrix<bool> *index = new matrix<bool>(mx.rows(), mx.cols());
+	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
 	T *ptr = index->mutable_ptr();
 	size_t ix = 0;
 	for (size_t i=0; i < mx.rows(); ++i)
 		for (size_t j=0; j < mx.cols(); ++j) {
 			if (mx(i, j) <= mx2(i, j))
-				ptr[ix++] = true;
+				ptr[ix++] = 1;
 			else
-				ptr[ix++] = false;
+				ptr[ix++] = 0;
 		}
 	return *index;
 }
 
 template<class T>
-matrix<bool>&  operator== (const view<T>& mx, const matrix<T>& mx2) {
+matrix<unsigned char>&  operator== (const view<T>& mx, const matrix<T>& mx2) {
 	assert(mx.rows() == mx2.rows() && mx.cols() == mx2.cols());
-	matrix<bool> *index = new matrix<bool>(mx.rows(), mx.cols());
+	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
 	T *ptr = index->mutable_ptr();
 	size_t ix = 0;
 	for (size_t i=0; i < mx.rows(); ++i)
 		for (size_t j=0; j < mx.cols(); ++j) {
 			if (mx(i, j) == mx2(i, j))
-				ptr[ix++] = true;
+				ptr[ix++] = 1;
 			else
-				ptr[ix++] = false;
+				ptr[ix++] = 0;
 		}
 	return *index;
 }
 template<class T>
-matrix<bool>&  operator!= (const view<T>& mx, const matrix<T>& mx2) {
+matrix<unsigned char>&  operator!= (const view<T>& mx, const matrix<T>& mx2) {
 	assert(mx.rows() == mx2.rows() && mx.cols() == mx2.cols());
-	matrix<bool> *index = new matrix<bool>(mx.rows(), mx.cols());
+	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
 	T *ptr = index->mutable_ptr();
 	size_t ix = 0;
 	for (size_t i=0; i < mx.rows(); ++i)
 		for (size_t j=0; j < mx.cols(); ++j) {
 			if (mx(i, j) != mx2(i, j))
-				ptr[ix++] = true;
+				ptr[ix++] = 1;
 			else
-				ptr[ix++] = false;
+				ptr[ix++] = 0;
 		}
 	return *index;
 }
 template<class T>
-matrix<bool>&  operator> (const view<T>& mx, const matrix<T>& mx2) {
+matrix<unsigned char>&  operator> (const view<T>& mx, const matrix<T>& mx2) {
 	assert(mx.rows() == mx2.rows() && mx.cols() == mx2.cols());
-	matrix<bool> *index = new matrix<bool>(mx.rows(), mx.cols());
+	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
 	T *ptr = index->mutable_ptr();
 	size_t ix = 0;
 	for (size_t i=0; i < mx.rows(); ++i)
 		for (size_t j=0; j < mx.cols(); ++j) {
 			if (mx(i, j) > mx2(i, j))
-				ptr[ix++] = true;
+				ptr[ix++] = 1;
 			else
-				ptr[ix++] = false;
+				ptr[ix++] = 0;
 		}
 	return *index;
 }
 template<class T>
-matrix<bool>&  operator>= (const view<T>& mx, const matrix<T>& mx2) {
+matrix<unsigned char>&  operator>= (const view<T>& mx, const matrix<T>& mx2) {
 	assert(mx.rows() == mx2.rows() && mx.cols() == mx2.cols());
-	matrix<bool> *index = new matrix<bool>(mx.rows(), mx.cols());
+	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
 	T *ptr = index->mutable_ptr();
 	size_t ix = 0;
 	for (size_t i=0; i < mx.rows(); ++i)
 		for (size_t j=0; j < mx.cols(); ++j) {
 			if (mx(i, j) >= mx2(i, j))
-				ptr[ix++] = true;
+				ptr[ix++] = 1;
 			else
-				ptr[ix++] = false;
+				ptr[ix++] = 0;
 		}
 	return *index;
 }
 template<class T>
-matrix<bool>&  operator< (const view<T>& mx, const matrix<T>& mx2) {
+matrix<unsigned char>&  operator< (const view<T>& mx, const matrix<T>& mx2) {
 	assert(mx.rows() == mx2.rows() && mx.cols() == mx2.cols());
-	matrix<bool> *index = new matrix<bool>(mx.rows(), mx.cols());
+	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
 	T *ptr = index->mutable_ptr();
 	size_t ix = 0;
 	for (size_t i=0; i < mx.rows(); ++i)
 		for (size_t j=0; j < mx.cols(); ++j) {
 			if (mx(i, j) < mx2(i, j))
-				ptr[ix++] = true;
+				ptr[ix++] = 1;
 			else
-				ptr[ix++] = false;
+				ptr[ix++] = 0;
 		}
 	return *index;
 }
 template<class T>
-matrix<bool>&  operator<= (const view<T>& mx, const matrix<T>& mx2) {
+matrix<unsigned char>&  operator<= (const view<T>& mx, const matrix<T>& mx2) {
 	assert(mx.rows() == mx2.rows() && mx.cols() == mx2.cols());
-	matrix<bool> *index = new matrix<bool>(mx.rows(), mx.cols());
+	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
 	T *ptr = index->mutable_ptr();
 	size_t ix = 0;
 	for (size_t i=0; i < mx.rows(); ++i)
 		for (size_t j=0; j < mx.cols(); ++j) {
 			if (mx(i, j) <= mx2(i, j))
-				ptr[ix++] = true;
+				ptr[ix++] = 1;
 			else
-				ptr[ix++] = false;
+				ptr[ix++] = 0;
 		}
 	return *index;
 }
 
 template<class T>
-matrix<bool>&  operator== (const matrix<T>& mx, const view<T>& mx2) {
+matrix<unsigned char>&  operator== (const matrix<T>& mx, const view<T>& mx2) {
 	assert(mx.rows() == mx2.rows() && mx.cols() == mx2.cols());
-	matrix<bool> *index = new matrix<bool>(mx.rows(), mx.cols());
+	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
 	T *ptr = index->mutable_ptr();
 	size_t ix = 0;
 	for (size_t i=0; i < mx.rows(); ++i)
 		for (size_t j=0; j < mx.cols(); ++j) {
 			if (mx(i, j) == mx2(i, j))
-				ptr[ix++] = true;
+				ptr[ix++] = 1;
 			else
-				ptr[ix++] = false;
+				ptr[ix++] = 0;
 		}
 	return *index;
 }
 template<class T>
-matrix<bool>&  operator!= (const matrix<T>& mx, const view<T>& mx2) {
+matrix<unsigned char>&  operator!= (const matrix<T>& mx, const view<T>& mx2) {
 	assert(mx.rows() == mx2.rows() && mx.cols() == mx2.cols());
-	matrix<bool> *index = new matrix<bool>(mx.rows(), mx.cols());
+	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
 	T *ptr = index->mutable_ptr();
 	size_t ix = 0;
 	for (size_t i=0; i < mx.rows(); ++i)
 		for (size_t j=0; j < mx.cols(); ++j) {
 			if (mx(i, j) != mx2(i, j))
-				ptr[ix++] = true;
+				ptr[ix++] = 1;
 			else
-				ptr[ix++] = false;
+				ptr[ix++] = 0;
 		}
 	return *index;
 }
 template<class T>
-matrix<bool>&  operator> (const matrix<T>& mx, const view<T>& mx2) {
+matrix<unsigned char>&  operator> (const matrix<T>& mx, const view<T>& mx2) {
 	assert(mx.rows() == mx2.rows() && mx.cols() == mx2.cols());
-	matrix<bool> *index = new matrix<bool>(mx.rows(), mx.cols());
+	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
 	T *ptr = index->mutable_ptr();
 	size_t ix = 0;
 	for (size_t i=0; i < mx.rows(); ++i)
 		for (size_t j=0; j < mx.cols(); ++j) {
 			if (mx(i, j) > mx2(i, j))
-				ptr[ix++] = true;
+				ptr[ix++] = 1;
 			else
-				ptr[ix++] = false;
+				ptr[ix++] = 0;
 		}
 	return *index;
 }
 template<class T>
-matrix<bool>&  operator>= (const matrix<T>& mx, const view<T>& mx2) {
+matrix<unsigned char>&  operator>= (const matrix<T>& mx, const view<T>& mx2) {
 	assert(mx.rows() == mx2.rows() && mx.cols() == mx2.cols());
-	matrix<bool> *index = new matrix<bool>(mx.rows(), mx.cols());
+	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
 	T *ptr = index->mutable_ptr();
 	size_t ix = 0;
 	for (size_t i=0; i < mx.rows(); ++i)
 		for (size_t j=0; j < mx.cols(); ++j) {
 			if (mx(i, j) >= mx2(i, j))
-				ptr[ix++] = true;
+				ptr[ix++] = 1;
 			else
-				ptr[ix++] = false;
+				ptr[ix++] = 0;
 		}
 	return *index;
 }
 template<class T>
-matrix<bool>&  operator< (const matrix<T>& mx, const view<T>& mx2) {
+matrix<unsigned char>&  operator< (const matrix<T>& mx, const view<T>& mx2) {
 	assert(mx.rows() == mx2.rows() && mx.cols() == mx2.cols());
-	matrix<bool> *index = new matrix<bool>(mx.rows(), mx.cols());
+	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
 	T *ptr = index->mutable_ptr();
 	size_t ix = 0;
 	for (size_t i=0; i < mx.rows(); ++i)
 		for (size_t j=0; j < mx.cols(); ++j) {
 			if (mx(i, j) < mx2(i, j))
-				ptr[ix++] = true;
+				ptr[ix++] = 1;
 			else
-				ptr[ix++] = false;
+				ptr[ix++] = 0;
 		}
 	return *index;
 }
 template<class T>
-matrix<bool>&  operator<= (const matrix<T>& mx, const view<T>& mx2) {
+matrix<unsigned char>&  operator<= (const matrix<T>& mx, const view<T>& mx2) {
 	assert(mx.rows() == mx2.rows() && mx.cols() == mx2.cols());
-	matrix<bool> *index = new matrix<bool>(mx.rows(), mx.cols());
+	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
 	T *ptr = index->mutable_ptr();
 	size_t ix = 0;
 	for (size_t i=0; i < mx.rows(); ++i)
 		for (size_t j=0; j < mx.cols(); ++j) {
 			if (mx(i, j) <= mx2(i, j))
-				ptr[ix++] = true;
+				ptr[ix++] = 1;
 			else
-				ptr[ix++] = false;
+				ptr[ix++] = 0;
 		}
 	return *index;
 }

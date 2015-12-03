@@ -555,7 +555,6 @@ template<class T> const T* matrix<T>::ptr() const { return data.data(); }
 template<class T> T* matrix<T>::mutable_ptr() { return data.data(); }
 
 template<class T> matrix<T>::~matrix() {
-	cout << endl << "*destructed*" << endl;
 	data.clear();
 }
 
@@ -576,12 +575,12 @@ template<class T> matrix<T>::matrix (T* raw_data, size_t rows, size_t cols)
 
 template<class T> T& matrix<T>::operator () (size_t i, size_t j)
 {
-	return data[i * num_cols + j];
+	return (num_rows == 1 || num_cols == 1) ? data[i + j] : data[i * num_cols + j];
 }
 
 template<class T> T matrix<T>::operator () (size_t i, size_t j) const
 {
-	return data[i * num_cols + j];
+	return (num_rows == 1 || num_cols == 1) ? data[i + j] : data[i * num_cols + j];
 }
 
 template<class T> matrix<T>& matrix<T>::load (const char *filename, size_t rows, size_t cols) {
@@ -1056,7 +1055,7 @@ template<class T> view<T>& matrix<T>::r_ (const matrix<unsigned char>& rows_) {
 	for (size_t i=0; i < num_cols; ++i)
 		cols.push_back(i);
 	for (size_t j=0; j < rows_.size(); ++j)
-		if (rows_(j,0) == 1)
+		if (rows_(0,j) == 1)
 			rows.push_back(j);
 	view<T> *v = new view<T>(num_rows, num_cols, cols, rows, data.data());
 	return *v;
@@ -1069,10 +1068,10 @@ template<class T> view<T>& matrix<T>::r_ (int r1, int r2) {
 	for (size_t i=0; i < num_cols; ++i)
 		cols.push_back(i);
 	if (r2 == matrix<T>::END)
-		r2 = num_rows - 1;
+		r2 = num_rows;
 		if (r1 == matrix<T>::END)
-			r1 = num_rows - 1;
-	for (size_t j=r1; j <= r2; ++j)
+			r1 = num_rows-1;
+	for (size_t j=r1; j < r2; ++j)
 		rows.push_back(j);
 	view<T> *v = new view<T>(num_rows, num_cols, cols, rows, data.data());
 	return *v;
@@ -1121,10 +1120,10 @@ template<class T> view<T>& matrix<T>::c_ (int c1, int c2) {
 	for (size_t i=0; i < num_rows; ++i)
 		rows.push_back(i);
 	if (c2 == matrix<T>::END)
-		c2 = num_cols - 1;
+		c2 = num_cols;
 		if (c1 == matrix<T>::END)
 			c1 = num_cols - 1;
-	for (size_t j=c1; j <= c2; ++j)
+	for (size_t j=c1; j < c2; ++j)
 		cols.push_back(j);
 	view<T> *v = new view<T>(num_rows, num_cols, cols, rows, data.data());
 	return *v;

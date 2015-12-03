@@ -6,8 +6,8 @@
 #include <thrust/functional.h>
 #include <thrust/sequence.h>
 
-#define BLOCK_SIZE_X 16
-#define BLOCK_SIZE_Y 16
+#define BLOCK_SIZE_X 32
+#define BLOCK_SIZE_Y 32
 
 void cuda_init (int& dev_id) {
   cudaError_t error;
