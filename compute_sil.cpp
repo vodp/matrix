@@ -141,11 +141,11 @@ matrix<float>& compute_coefficients (matrix<float>& X, matrix<int>& y, matrix<fl
 }
 void csil () {
 	cout << "Loading features..." << endl;
-	matrix<float> X = matrix<float>::load("../dat/20m_signatures_random.caffe.256", 18389592, 256);
+	matrix<float>& X = matrix<float>::load("../dat/20m_signatures_random.caffe.256", 18389592, 256);
 	X = X.c_(0, 16).detach();
 	cout << "...has dimension (" << X.rows() << ", " << X.cols() << ")" << endl;
 	cout << "Loading labels..." << endl;
-	matrix<int> y = load_labels("../dat/cluster_20msig_5kcenter_random.lst");
+	matrix<int>& y = load_labels("../dat/cluster_20msig_5kcenter_random.lst");
 	cout << "...has dimension (" << y.rows() << ", " << y.cols() << ")" << endl;
 	view<int> yy = y.r_(std::vector<size_t>({5176, 10577, 10940, 11167, 15510, 15914}));
 	SHOW("y[:6]", yy);
@@ -160,10 +160,36 @@ void csil () {
 		matrix<float>::dump("../dat/centers.16", centers);
 	}
 	cout << "Computing Silhouette coefficients..." << endl;
-	matrix<float> coeffs = compute_coefficients (X, y, centers);
+	matrix<float>& coeffs = compute_coefficients (X, y, centers);
 	matrix<float>::dump("../dat/coeffs.bin", coeffs);
 	cout << "Dumped results to ../dat/coeffs.bin. DONE.";
+	delete &X;
+	delete &y;
+	delete &coeffs;
 }
+// void select_training_data () {
+// 	matrix<float>& coeffs = matrix<float>::load("../dat/coeffs.bin", 5000, 1);
+// 	matrix<size_t>& top_clusters = matrix_argsort(coeffs);
+// 	view<size_t>& top1k = top_clusters.c_(0,1000);
+// 	cout << "The largest Silhouette coefficient = " << coeffs(top1k(0,0), 0) << endl;
+// 	cout << "The smallest Silhouette coefficient = " << coeffs(top1k(matrix<size_t>::END,0), 0) << endl;
+// 	cout << "Loading labels..." << endl;
+// 	matrix<int>&  y = load_labels("../dat/cluster_20msig_5kcenter_random.lst");
+// 	ofstream out_file("../dat/train.txt", ios::out);
+// 	for (size_t i=0; i < 1000; i++) {
+// 		matrix<unsigned char>& ix = y == top1k(i,0);
+// 		view<int>& suby = y.r_(ix);
+// 		for (size_t j=0; j < suby.size(); ++j)
+// 			out_file << suby(j,0) << " " << top1k(i,0) << endl;
+// 		delete &suby;
+// 		delete &ix;
+// 		delete &suby;
+// 	}
+// 	out_file.close();
+// 	delete &coeffs;
+// 	delete &top_clusters;
+// 	delete &top1k;
+// }
 
 void csil_sanitycheck () {
 	cout << "Loading features..." << endl;
@@ -451,13 +477,20 @@ void test_detach() {
 	// SHOW("C", C);
 }
 
+void test_c11() {
+	matrix<float> a(4, 5);
+	a.fill(1.f);
+	matrix<unsigned char> ix = a == 0.f;
+}
+
 int main()
 {
 	// test_cuda();
 	// test_cuda_pdist();
 	// test_matrix2();
 	// test_sorting();
-	csil();
+	// csil();
 	// csil_sanitycheck();
 	// test_detach();
+	test_c11();
 }

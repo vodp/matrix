@@ -31,16 +31,16 @@ void cuda_init (int& dev_id) {
 //   cublasDestroy(handle);
 // }
 
-matrix<float>& cuda_matrix_dot (const matrix<float>& A, const matrix<float>& B) {
+matrix<float> cuda_matrix_dot (const matrix<float>& A, const matrix<float>& B) {
   assert(A.cols() == B.rows());
   int M = A.rows();
 	int N = B.cols();
 	int K = B.rows();
-	matrix<float> *C = new matrix<float>(M, N);
+	matrix<float> C(M, N);
 
   const float *ptr_a = A.ptr();
   const float *ptr_b = B.ptr();
-  float *ptr_c = C->mutable_ptr();
+  float *ptr_c = C.mutable_ptr();
 
   const float alpha = 1.0f;
   const float beta = 0.0f;
@@ -51,16 +51,16 @@ matrix<float>& cuda_matrix_dot (const matrix<float>& A, const matrix<float>& B) 
   float *ptr_A, *ptr_B, *ptr_C;
   cudaMalloc((void**) &ptr_A, sizeof(float)*A.size());
   cudaMalloc((void**) &ptr_B, sizeof(float)*B.size());
-  cudaMalloc((void**) &ptr_C, sizeof(float)*C->size());
+  cudaMalloc((void**) &ptr_C, sizeof(float)*C.size());
   cudaMemcpy(ptr_A, ptr_a, sizeof(float)*A.size(), cudaMemcpyHostToDevice);
   cudaMemcpy(ptr_B, ptr_b, sizeof(float)*B.size(), cudaMemcpyHostToDevice);
   cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, N, M, K, &alpha, ptr_B, N, ptr_A, K, &beta, ptr_C, N);
-  cudaMemcpy(ptr_c, ptr_C, sizeof(float)*C->size(), cudaMemcpyDeviceToHost);
+  cudaMemcpy(ptr_c, ptr_C, sizeof(float)*C.size(), cudaMemcpyDeviceToHost);
   cudaFree(ptr_A);
   cudaFree(ptr_B);
   cudaFree(ptr_C);
   cublasDestroy(handle);
-  return *C;
+  return C;
 }
 
 struct abs2 {
@@ -76,7 +76,7 @@ __global__ void assemble_final_result (const float * __restrict__ d_norms_x_2, c
 
 int iDivUp(int a, int b){ return ((a % b) != 0) ? (a / b + 1) : (a / b); }
 
-matrix<float>& cuda_pairwise_distance (const matrix<float>& A, const matrix<float>& B) {
+matrix<float> cuda_pairwise_distance (const matrix<float>& A, const matrix<float>& B) {
   assert(A.cols() == B.cols());
 
   // pointer references to host memory variables
@@ -115,15 +115,15 @@ matrix<float>& cuda_pairwise_distance (const matrix<float>& A, const matrix<floa
   assemble_final_result<<<dimGrid, dimBlock>>> (thrust::raw_pointer_cast(d_norms_A_2.data()), thrust::raw_pointer_cast(d_norms_B_2.data()), ptr_C, A.rows(), B.rows());
 
   // copy result from device to host
-  matrix<float> *C = new matrix<float>(A.rows(), B.rows());
-  float *ptr_c = C->mutable_ptr();
-  cudaMemcpy(ptr_c, ptr_C, sizeof(float)*C->size(), cudaMemcpyDeviceToHost);
+  matrix<float> C(A.rows(), B.rows());
+  float *ptr_c = C.mutable_ptr();
+  cudaMemcpy(ptr_c, ptr_C, sizeof(float)*C.size(), cudaMemcpyDeviceToHost);
   cudaFree(ptr_C);
   cublasDestroy(handle);
-  return *C;
+  return C;
 }
 
-matrix<float>& cuda_pairwise_distance (const matrix<float>& A) {
+matrix<float> cuda_pairwise_distance (const matrix<float>& A) {
   // pointer references to host memory variables
   thrust::device_vector<float> d_A(A.ptr(), A.ptr() + A.size());
   float *ptr_A = thrust::raw_pointer_cast(d_A.data());
@@ -152,10 +152,10 @@ matrix<float>& cuda_pairwise_distance (const matrix<float>& A) {
   assemble_final_result<<<dimGrid, dimBlock>>> (thrust::raw_pointer_cast(d_norms_A_2.data()), thrust::raw_pointer_cast(d_norms_A_2.data()), ptr_C, A.rows(), A.rows());
 
   // copy result from device to host
-  matrix<float> *C = new matrix<float>(A.rows(), A.rows());
-  float *ptr_c = C->mutable_ptr();
-  cudaMemcpy(ptr_c, ptr_C, sizeof(float)*C->size(), cudaMemcpyDeviceToHost);
+  matrix<float> C(A.rows(), A.rows());
+  float *ptr_c = C.mutable_ptr();
+  cudaMemcpy(ptr_c, ptr_C, sizeof(float)*C.size(), cudaMemcpyDeviceToHost);
   cudaFree(ptr_C);
   cublasDestroy(handle);
-  return *C;
+  return C;
 }

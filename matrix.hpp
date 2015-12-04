@@ -28,9 +28,10 @@ public:
 		matrix ();
 		matrix (size_t rows, size_t cols);
 		matrix (T *raw_data, size_t rows, size_t cols);
+		matrix (std::vector<T>& data, size_t rows, size_t cols);
 		matrix (const matrix<T>& mx);
 		matrix (const view<T>& mx);
-		// matrix (matrix<T>&& mx);
+		matrix (matrix<T>&& mx);
 		~matrix ();
 
 		const T* ptr() const;
@@ -43,9 +44,8 @@ public:
 		size_t rows() const;
 		size_t cols() const;
 		size_t size() const;
-		matrix<T>& size(size_t rows, size_t cols);
-		matrix<size_t>& shape() const;
 		size_t shape(int axis) const;
+		matrix<size_t> shape() const;
 
 		// arimethic operators
 		matrix<T>& add(T t);
@@ -54,15 +54,16 @@ public:
 
 		matrix<T>& t ();
 		matrix<T>& reshape (size_t a1, size_t a2);
+		matrix<T>& size(size_t rows, size_t cols);
 
 		T max () const;
 		T min () const;
 		T sum () const;
 		T mean() const;
-		matrix<T>& max (int axis) const;
-		matrix<T>& min (int axis) const;
-		matrix<T>& sum (int axis) const;
-		matrix<T>& mean (int axis) const;
+		matrix<T> max (int axis) const;
+		matrix<T> min (int axis) const;
+		matrix<T> sum (int axis) const;
+		matrix<T> mean (int axis) const;
 
 		// fillers
 		matrix<T>& fill (T value);
@@ -70,25 +71,25 @@ public:
 		matrix<T>& randn ();
 
 		// slicing methods
-		view<T>& r_ (const vector<size_t>& rows);
-		view<T>& r_ (const matrix<unsigned char>& rows);
-		view<T>& r_ (int r1, int r2);
-		view<T>& r_ (int r);
+		view<T> r_ (const vector<size_t>& rows);
+		view<T> r_ (const matrix<unsigned char>& rows);
+		view<T> r_ (int r1, int r2);
+		view<T> r_ (int r);
 
-		view<T>& c_ (const vector<size_t>& cols);
-		view<T>& c_ (const matrix<unsigned char>& cols);
-		view<T>& c_ (int c1, int c2);
-		view<T>& c_ (int c);
+		view<T> c_ (const vector<size_t>& cols);
+		view<T> c_ (const matrix<unsigned char>& cols);
+		view<T> c_ (int c1, int c2);
+		view<T> c_ (int c);
 
-		view<T>& grid (const matrix<unsigned char>& rows, const matrix<unsigned char>& cols);
-		view<T>& grid (const vector<size_t>& rows, const std::vector<size_t>& cols);
-		view<T>& area (int r1, int r2, int c1, int c2);
+		view<T> grid (const matrix<unsigned char>& rows, const matrix<unsigned char>& cols);
+		view<T> grid (const vector<size_t>& rows, const std::vector<size_t>& cols);
+		view<T> area (int r1, int r2, int c1, int c2);
 
 		// assignment operators
-		// matrix<T>& operator= (matrix<T>&& mx);
+		matrix<T>& operator= (matrix<T>&& mx);
 		matrix<T>& operator= (const matrix<T>& mx);
 		matrix<T>& operator= (const view<T>& mx);
-		// matrix<T>& operator= (const T t);
+		matrix<T>& operator= (const T t);
 
 		// element-wise operators
 		matrix<T>& add(const matrix<T>& mx);
@@ -96,14 +97,23 @@ public:
 		matrix<T>& add(const view<T>& mx);
 		matrix<T>& mul(const view<T>& mx);
 
+		matrix<T>& operator+= (const matrix<T>& mx);
+		matrix<T>& operator-= (const matrix<T>& mx);
+		matrix<T>& operator*= (const matrix<T>& mx);
+		matrix<T>& operator/= (const matrix<T>& mx);
+		matrix<T>& operator+= (const view<T>& mx);
+		matrix<T>& operator-= (const view<T>& mx);
+		matrix<T>& operator*= (const view<T>& mx);
+		matrix<T>& operator/= (const view<T>& mx);
+
 		// dot-product operator
 		matrix<T>& dot(const matrix<T>& mx);
 		matrix<T>& dot(const view<T>& mx);
 
 		// static methods
-		static matrix<T>& load (const char* filename, size_t rows, size_t cols);
+		static matrix<T> load (const char* filename, size_t rows, size_t cols);
 		static void 			dump (const char* filename, matrix<T>& mx);
-		static matrix<T>& tile (const matrix<T>& pattern, size_t nrows, size_t ncols);
+		static matrix<T> tile (const matrix<T>& pattern, size_t nrows, size_t ncols);
 
 		// some constants
 		static int const END;
@@ -144,70 +154,80 @@ template<class T> int const matrix<T>::SORT_FLAT = -1;
 
 template<class T> ostream& operator<< (ostream& os, const matrix<T>& mx);
 
-template<class T> matrix<T>& operator+ (const matrix<T>& A, const matrix<T>& B);
-template<class T> matrix<T>& operator+ (const matrix<T>& A, const T t);
-template<class T> matrix<T>& operator+ (const T t, const matrix<T>& A);
+template<class T> matrix<T> operator+ (const matrix<T>& A, const matrix<T>& B);
+template<class T> matrix<T> operator+ (const matrix<T>& A, const T t);
+template<class T> matrix<T> operator+ (const T t, const matrix<T>& A);
 
-template<class T> matrix<T>& operator- (const matrix<T>& A, const matrix<T>& B);
-template<class T> matrix<T>& operator- (const matrix<T>& A, const T t);
-template<class T> matrix<T>& operator- (const T t, const matrix<T>& A);
+template<class T> matrix<T> operator- (const matrix<T>& A, const matrix<T>& B);
+template<class T> matrix<T> operator- (const matrix<T>& A, const T t);
+template<class T> matrix<T> operator- (const T t, const matrix<T>& A);
 
-template<class T> matrix<T>& operator* (const matrix<T>& A, const matrix<T>& B);
-template<class T> matrix<T>& operator* (const matrix<T>& A, const T t);
-template<class T> matrix<T>& operator* (const T t, const matrix<T>& A);
+template<class T> matrix<T> operator* (const matrix<T>& A, const matrix<T>& B);
+template<class T> matrix<T> operator* (const matrix<T>& A, const T t);
+template<class T> matrix<T> operator* (const T t, const matrix<T>& A);
 
-template<class T> matrix<T>& operator/ (const matrix<T>& A, const matrix<T>& B);
-template<class T> matrix<T>& operator/ (const matrix<T>& A, const T t);
-template<class T> matrix<T>& operator/ (const T t, const matrix<T>& A);
+template<class T> matrix<T> operator/ (const matrix<T>& A, const matrix<T>& B);
+template<class T> matrix<T> operator/ (const matrix<T>& A, const T t);
+template<class T> matrix<T> operator/ (const T t, const matrix<T>& A);
 
-template<class T> matrix<unsigned char>&  operator< (const matrix<T>& mx, const matrix<T>& mx2);
-template<class T> matrix<unsigned char>&  operator<= (const matrix<T>& mx, const matrix<T>& mx2);
-template<class T> matrix<unsigned char>&  operator> (const matrix<T>& mx, const matrix<T>& mx2);
-template<class T> matrix<unsigned char>&  operator>= (const matrix<T>& mx, const matrix<T>& mx2);
-template<class T> matrix<unsigned char>&  operator== (const matrix<T>& mx, const matrix<T>& mx2);
-template<class T> matrix<unsigned char>&  operator!= (const matrix<T>& mx, const matrix<T>& mx2);
+template<class T> matrix<unsigned char>  operator< (const matrix<T>& mx, const matrix<T>& mx2);
+template<class T> matrix<unsigned char>  operator<= (const matrix<T>& mx, const matrix<T>& mx2);
+template<class T> matrix<unsigned char>  operator> (const matrix<T>& mx, const matrix<T>& mx2);
+template<class T> matrix<unsigned char>  operator>= (const matrix<T>& mx, const matrix<T>& mx2);
+template<class T> matrix<unsigned char>  operator== (const matrix<T>& mx, const matrix<T>& mx2);
+template<class T> matrix<unsigned char>  operator!= (const matrix<T>& mx, const matrix<T>& mx2);
 
-template<class T> matrix<unsigned char>&  operator< (const matrix<T>& mx, const T t);
-template<class T> matrix<unsigned char>&  operator<= (const matrix<T>& mx, const T t);
-template<class T> matrix<unsigned char>&  operator> (const matrix<T>& mx, const T t);
-template<class T> matrix<unsigned char>&  operator>= (const matrix<T>& mx, const T t);
-template<class T> matrix<unsigned char>&  operator== (const matrix<T>& mx, const T t);
-template<class T> matrix<unsigned char>&  operator!= (const matrix<T>& mx, const T t);
+template<class T> matrix<unsigned char>  operator< (const matrix<T>& mx, const T t);
+template<class T> matrix<unsigned char>  operator<= (const matrix<T>& mx, const T t);
+template<class T> matrix<unsigned char>  operator> (const matrix<T>& mx, const T t);
+template<class T> matrix<unsigned char>  operator>= (const matrix<T>& mx, const T t);
+template<class T> matrix<unsigned char> operator== (const matrix<T>& mx, const T t);
+template<class T> matrix<unsigned char>  operator!= (const matrix<T>& mx, const T t);
 
-template<class T> matrix<unsigned char>&  operator< (const T t, const matrix<T>& mx);
-template<class T> matrix<unsigned char>&  operator<= (const T t, const matrix<T>& mx);
-template<class T> matrix<unsigned char>&  operator> (const T t, const matrix<T>& mx);
-template<class T> matrix<unsigned char>&  operator>= (const T t, const matrix<T>& mx);
-template<class T> matrix<unsigned char>&  operator== (const T t, const matrix<T>& mx);
-template<class T> matrix<unsigned char>&  operator!= (const T t, const matrix<T>& mx);
+template<class T> matrix<unsigned char>  operator< (const T t, const matrix<T>& mx);
+template<class T> matrix<unsigned char>  operator<= (const T t, const matrix<T>& mx);
+template<class T> matrix<unsigned char>  operator> (const T t, const matrix<T>& mx);
+template<class T> matrix<unsigned char>  operator>= (const T t, const matrix<T>& mx);
+template<class T> matrix<unsigned char>  operator== (const T t, const matrix<T>& mx);
+template<class T> matrix<unsigned char>  operator!= (const T t, const matrix<T>& mx);
 
-template<class T> matrix<T>& operator^ (const matrix<T>& A, const T t);
+template<class T> matrix<T> operator^ (const matrix<T>& A, const T t);
 
 bool _sort_descending (float i, float j);
 bool des_comparator (const pair<float, size_t>& l, const pair<float, size_t>& r);
 bool asc_comparator (const pair<float, size_t>& l, const pair<float, size_t>& r);
-matrix<float>& matrix_sort (const matrix<float>& mx, int axis=-1, bool ascending=true);
-matrix<float>& matrix_sort (const view<float>& mx, int axis=-1, bool ascending=true);
-matrix<size_t>& argsort (const matrix<float>& mx, int axis=-1, bool ascending=true);
-matrix<size_t>& argsort (const view<float>& mx, int axis=-1, bool ascending=true);
+matrix<float> matrix_sort (const matrix<float>& mx, int axis=-1, bool ascending=true);
+matrix<float> matrix_sort (const view<float>& mx, int axis=-1, bool ascending=true);
+matrix<size_t> argsort (const matrix<float>& mx, int axis=-1, bool ascending=true);
+matrix<size_t> argsort (const view<float>& mx, int axis=-1, bool ascending=true);
 
-matrix<double>& blas_matrix_dot (const matrix<double>& A, const matrix<double>& B);
-matrix<float>& blas_matrix_dot (const matrix<float>& A, const matrix<float>& B);
-matrix<float>& blas_pairwise_distance (const matrix<float>& A, const matrix<float>& B);
-matrix<double>& blas_pairwise_distance (const matrix<double>& A, const matrix<double>& B);
+matrix<double> blas_matrix_dot (const matrix<double>& A, const matrix<double>& B);
+matrix<float> blas_matrix_dot (const matrix<float>& A, const matrix<float>& B);
+matrix<float> blas_pairwise_distance (const matrix<float>& A, const matrix<float>& B);
+matrix<double> blas_pairwise_distance (const matrix<double>& A, const matrix<double>& B);
 
 void 					cuda_init (int& dev_id);
-matrix<float>& cuda_matrix_dot (const matrix<float>& A, const matrix<float>& B);
-matrix<float>& cuda_pairwise_distance (const matrix<float>& A, const matrix<float>& B);
-matrix<float>& cuda_pairwise_distance (const matrix<float>& A);
+matrix<float> cuda_matrix_dot (const matrix<float>& A, const matrix<float>& B);
+matrix<float> cuda_pairwise_distance (const matrix<float>& A, const matrix<float>& B);
+matrix<float> cuda_pairwise_distance (const matrix<float>& A);
 ////////////////////////////////////////////////////////////////////////////////
 template<class T> matrix<T>::matrix (const matrix<T>& mx) {
-	// cout << endl << "*copy constructor*" << endl;
+	cout << "copy-tor" << endl;
 	this->num_rows = mx.num_rows;
 	this->num_cols = mx.num_cols;
 	this->data = mx.data;
 }
-
+template<class T> matrix<T>::matrix (matrix<T>&& mx) {
+	cout << "move-tor" << endl;
+	num_rows = mx.num_rows;
+	num_cols = mx.num_cols;
+	data = std::move(mx.data);
+}
+template<class T> matrix<T>::matrix (std::vector<T>& data_, size_t rows, size_t cols) {
+	num_rows = rows;
+	num_cols = cols;
+	std::swap(data, data_);
+}
 template<class T> matrix<T>::matrix (const view<T>& mx) {
 	// cout << endl << "*copy constructor*" << endl;
 	this->num_rows = mx.steps.size();
@@ -219,8 +239,8 @@ template<class T> matrix<T>::matrix (const view<T>& mx) {
 			data.push_back(mx(j,i));
 }
 template<class T> matrix<T>& matrix<T>::operator= (const matrix<T>& mx) {
+	cout << "copy-assign" << endl;
 	if (this != &mx) {
-		// cout << endl << "*copy assignment*" << endl;
 		if (this->num_rows != mx.rows() || this->num_cols != mx.cols()) {
 			this->data.clear();
 			this->num_cols = mx.cols();
@@ -229,6 +249,16 @@ template<class T> matrix<T>& matrix<T>::operator= (const matrix<T>& mx) {
 		}
 		data = mx.data;
 		// copy(mx.ptr(), mx.ptr() + mx.size(), data.data());
+	}
+	return *this;
+}
+template<class T> matrix<T>& matrix<T>::operator= (matrix<T>&& mx) {
+	cout << "move-asign" << endl;
+	if (this != &mx) {
+		data.clear();
+		num_rows = mx.num_rows;
+		num_cols = mx.num_cols;
+		data = std::move(mx.data);
 	}
 	return *this;
 }
@@ -348,7 +378,7 @@ template<class T> T matrix<T>::mean () const {
 		value += ptr[i];
 	return value/data.size();
 }
-template<class T> matrix<T>& matrix<T>::max (int axis) const {
+template<class T> matrix<T> matrix<T>::max (int axis) const {
 	assert (axis == 1 || axis == 0);
 	if (axis == 0) {
 		matrix<T> *vector = new matrix<T>(1, num_cols);
@@ -376,7 +406,7 @@ template<class T> matrix<T>& matrix<T>::max (int axis) const {
 		return *vector;
 	}
 }
-template<class T> matrix<T>& matrix<T>::min (int axis) const {
+template<class T> matrix<T> matrix<T>::min (int axis) const {
 	assert (axis == 1 || axis == 0);
 	if (axis == 0) {
 		matrix<T> *vector = new matrix<T>(1, num_cols);
@@ -404,7 +434,7 @@ template<class T> matrix<T>& matrix<T>::min (int axis) const {
 		return *vector;
 	}
 }
-template<class T> matrix<T>& matrix<T>::sum (int axis) const {
+template<class T> matrix<T> matrix<T>::sum (int axis) const {
 	assert (axis == 1 || axis == 0);
 	if (axis == 0) {
 		matrix<T> *vector = new matrix<T>(1, num_cols);
@@ -428,7 +458,7 @@ template<class T> matrix<T>& matrix<T>::sum (int axis) const {
 		return *vector;
 	}
 }
-template<class T> matrix<T>& matrix<T>::mean (int axis) const {
+template<class T> matrix<T> matrix<T>::mean (int axis) const {
 	assert (axis == 1 || axis == 0);
 	if (axis == 0) {
 		matrix<T> *vector = new matrix<T>(1, num_cols);
@@ -531,7 +561,7 @@ template<class T> matrix<T>& matrix<T>::size(size_t rows, size_t cols) {
 	return *this;
 }
 
-template<class T> matrix<size_t>& matrix<T>::shape() const {
+template<class T> matrix<size_t> matrix<T>::shape() const {
 	matrix<size_t>* mx = new matrix<size_t>(1,2);
 	(*mx)(0,0) = num_rows;
 	(*mx)(0,1) = num_cols;
@@ -583,7 +613,7 @@ template<class T> T matrix<T>::operator () (size_t i, size_t j) const
 	return (num_rows == 1 || num_cols == 1) ? data[i + j] : data[i * num_cols + j];
 }
 
-template<class T> matrix<T>& matrix<T>::load (const char *filename, size_t rows, size_t cols) {
+template<class T> matrix<T> matrix<T>::load (const char *filename, size_t rows, size_t cols) {
 	ifstream file (filename, ios::binary | ios::in | ios::ate);
 	assert (file.is_open());
 	streampos size = file.tellg();
@@ -628,10 +658,12 @@ ostream& operator<< (ostream& os, const matrix<T>& mx) {
 }
 
 template<class T>
-matrix<unsigned char>&  operator== (const matrix<T>& mx, const T value) {
-	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
+matrix<unsigned char> operator== (const matrix<T>& mx, const T value) {
+	matrix<unsigned char> index(mx.rows(), mx.cols());
+	// vector<unsigned char> index(mx.size());
+	// matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
 	const T *ptr = mx.ptr();
-	unsigned char *ptr_i = index->mutable_ptr();
+	unsigned char *ptr_i = index.mutable_ptr();
 	size_t m = mx.size();
 	for (size_t i=0; i < m; ++i) {
 		if (ptr[i] == value)
@@ -639,14 +671,14 @@ matrix<unsigned char>&  operator== (const matrix<T>& mx, const T value) {
 		else
 			ptr_i[i] = 0;
 	}
-	return *index;
+	return index;//matrix<unsigned char>(index, mx.rows(), mx.cols());
 }
 
 template<class T>
-matrix<unsigned char>&  operator!= (const matrix<T>& mx, const T value) {
-	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
+matrix<unsigned char>  operator!= (const matrix<T>& mx, const T value) {
+	matrix<unsigned char> index(mx.rows(), mx.cols());
 	const T *ptr = mx.ptr();
-	unsigned char *ptr_i = index->mutable_ptr();
+	unsigned char *ptr_i = 	index.mutable_ptr();
 	size_t m = mx.size();
 	for (size_t i=0; i < m; ++i) {
 		if (ptr[i] != value)
@@ -654,14 +686,14 @@ matrix<unsigned char>&  operator!= (const matrix<T>& mx, const T value) {
 		else
 			ptr_i[i] = 0;
 	}
-	return *index;
+	return index;
 }
 
 template<class T>
-matrix<unsigned char>&  operator> (const matrix<T>& mx, const T value) {
-	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
+matrix<unsigned char>  operator> (const matrix<T>& mx, const T value) {
+	matrix<unsigned char> index(mx.rows(), mx.cols());
 	const T *ptr = mx.ptr();
-	unsigned char *ptr_i = index->mutable_ptr();
+	unsigned char *ptr_i = 	index.mutable_ptr();
 	size_t m = mx.size();
 	for (size_t i=0; i < m; ++i) {
 		if (ptr[i] > value)
@@ -669,13 +701,13 @@ matrix<unsigned char>&  operator> (const matrix<T>& mx, const T value) {
 		else
 			ptr_i[i] = 0;
 	}
-	return *index;
+	return index;
 }
 template<class T>
-matrix<unsigned char>&  operator>= (const matrix<T>& mx, const T value) {
-	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
+matrix<unsigned char>  operator>= (const matrix<T>& mx, const T value) {
+	matrix<unsigned char> index(mx.rows(), mx.cols());
 	const T *ptr = mx.ptr();
-	unsigned char *ptr_i = index->mutable_ptr();
+	unsigned char *ptr_i = 	index.mutable_ptr();
 	size_t m = mx.size();
 	for (size_t i=0; i < m; ++i) {
 		if (ptr[i] >= value)
@@ -683,13 +715,13 @@ matrix<unsigned char>&  operator>= (const matrix<T>& mx, const T value) {
 		else
 			ptr_i[i] = 0;
 	}
-	return *index;
+	return index;
 }
 template<class T>
-matrix<unsigned char>&  operator< (const matrix<T>& mx, const T value) {
-	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
+matrix<unsigned char>  operator< (const matrix<T>& mx, const T value) {
+	matrix<unsigned char> index(mx.rows(), mx.cols());
 	const T *ptr = mx.ptr();
-	unsigned char *ptr_i = index->mutable_ptr();
+	unsigned char *ptr_i = 	index.mutable_ptr();
 	size_t m = mx.size();
 	for (size_t i=0; i < m; ++i) {
 		if (ptr[i] < value)
@@ -697,13 +729,13 @@ matrix<unsigned char>&  operator< (const matrix<T>& mx, const T value) {
 		else
 			ptr_i[i] = 0;
 	}
-	return *index;
+	return index;
 }
 template<class T>
-matrix<unsigned char>&  operator<= (const matrix<T>& mx, const T value) {
-	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
+matrix<unsigned char>  operator<= (const matrix<T>& mx, const T value) {
+	matrix<unsigned char> index(mx.rows(), mx.cols());
 	const T *ptr = mx.ptr();
-	unsigned char *ptr_i = index->mutable_ptr();
+	unsigned char *ptr_i = 	index.mutable_ptr();
 	size_t m = mx.size();
 	for (size_t i=0; i < m; ++i) {
 		if (ptr[i] <= value)
@@ -711,14 +743,14 @@ matrix<unsigned char>&  operator<= (const matrix<T>& mx, const T value) {
 		else
 			ptr_i[i] = 0;
 	}
-	return *index;
+	return index;
 }
 
 
-template<class T> matrix<T>&  operator== (const T value, const matrix<T>& mx) {
-	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
+template<class T> matrix<unsigned char>  operator== (const T value, const matrix<T>& mx) {
+	matrix<unsigned char> index(mx.rows(), mx.cols());
 	const T *ptr = mx.ptr();
-	unsigned char *ptr_i = index->mutable_ptr();
+	unsigned char *ptr_i = 	index.mutable_ptr();
 	size_t m = mx.size();
 	for (size_t i=0; i < m; ++i) {
 		if (ptr[i] == value)
@@ -726,12 +758,12 @@ template<class T> matrix<T>&  operator== (const T value, const matrix<T>& mx) {
 		else
 			ptr_i[i] = 0;
 	}
-	return *index;
+	return index;
 }
-template<class T> matrix<unsigned char>&  operator!= (const T value, const matrix<T>& mx) {
-	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
+template<class T> matrix<unsigned char>  operator!= (const T value, const matrix<T>& mx) {
+	matrix<unsigned char> index(mx.rows(), mx.cols());
 	const T *ptr = mx.ptr();
-	unsigned char *ptr_i = index->mutable_ptr();
+	unsigned char *ptr_i = 	index.mutable_ptr();
 	size_t m = mx.size();
 	for (size_t i=0; i < m; ++i) {
 		if (ptr[i] != value)
@@ -739,12 +771,12 @@ template<class T> matrix<unsigned char>&  operator!= (const T value, const matri
 		else
 			ptr_i[i] = 0;
 	}
-	return *index;
+	return index;
 }
-template<class T> matrix<unsigned char>&  operator> (const T value, const matrix<T>& mx) {
-	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
+template<class T> matrix<unsigned char>  operator> (const T value, const matrix<T>& mx) {
+	matrix<unsigned char> index(mx.rows(), mx.cols());
 	const T *ptr = mx.ptr();
-	unsigned char *ptr_i = index->mutable_ptr();
+	unsigned char *ptr_i = 	index.mutable_ptr();
 	size_t m = mx.size();
 	for (size_t i=0; i < m; ++i) {
 		if (ptr[i] > value)
@@ -752,12 +784,12 @@ template<class T> matrix<unsigned char>&  operator> (const T value, const matrix
 		else
 			ptr_i[i] = 0;
 	}
-	return *index;
+	return index;
 }
-template<class T> matrix<unsigned char>&  operator>= (const T value, const matrix<T>& mx) {
-	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
+template<class T> matrix<unsigned char>  operator>= (const T value, const matrix<T>& mx) {
+	matrix<unsigned char> index(mx.rows(), mx.cols());
 	const T *ptr = mx.ptr();
-	unsigned char *ptr_i = index->mutable_ptr();
+	unsigned char *ptr_i = 	index.mutable_ptr();
 	size_t m = mx.size();
 	for (size_t i=0; i < m; ++i) {
 		if (ptr[i] >= value)
@@ -765,12 +797,12 @@ template<class T> matrix<unsigned char>&  operator>= (const T value, const matri
 		else
 			ptr_i[i] = 0;
 	}
-	return *index;
+	return index;
 }
-template<class T> matrix<unsigned char>&  operator< (const T value, const matrix<T>& mx) {
-	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
+template<class T> matrix<unsigned char>  operator< (const T value, const matrix<T>& mx) {
+	matrix<unsigned char> index(mx.rows(), mx.cols());
 	const T *ptr = mx.ptr();
-	unsigned char *ptr_i = index->mutable_ptr();
+	unsigned char *ptr_i = 	index.mutable_ptr();
 	size_t m = mx.size();
 	for (size_t i=0; i < m; ++i) {
 		if (ptr[i] < value)
@@ -778,12 +810,12 @@ template<class T> matrix<unsigned char>&  operator< (const T value, const matrix
 		else
 			ptr_i[i] = 0;
 	}
-	return *index;
+	return index;
 }
-template<class T> matrix<unsigned char>&  operator<= (const T value, const matrix<T>& mx) {
-	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
+template<class T> matrix<unsigned char>  operator<= (const T value, const matrix<T>& mx) {
+	matrix<unsigned char> index(mx.rows(), mx.cols());
 	const T *ptr = mx.ptr();
-	unsigned char *ptr_i = index->mutable_ptr();
+	unsigned char *ptr_i = 	index.mutable_ptr();
 	size_t m = mx.size();
 	for (size_t i=0; i < m; ++i) {
 		if (ptr[i] <= value)
@@ -791,16 +823,16 @@ template<class T> matrix<unsigned char>&  operator<= (const T value, const matri
 		else
 			ptr_i[i] = 0;
 	}
-	return *index;
+	return index;
 }
 //
 template<class T>
-matrix<unsigned char>&  operator== (const matrix<T>& mx, const matrix<T>& mx2) {
+matrix<unsigned char>  operator== (const matrix<T>& mx, const matrix<T>& mx2) {
 	assert(mx.rows() == mx2.rows() && mx.cols() == mx2.cols());
-	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
+	matrix<unsigned char> index(mx.rows(), mx.cols());
 	const T *ptr = mx.ptr();
 	const T *ptr2 = mx2.ptr();
-	unsigned char *ptr_i = index->mutable_ptr();
+	unsigned char *ptr_i = 	index.mutable_ptr();
 	size_t m = mx.size();
 	for (size_t i=0; i < m; ++i) {
 		if (ptr[i] == ptr2[i])
@@ -808,16 +840,16 @@ matrix<unsigned char>&  operator== (const matrix<T>& mx, const matrix<T>& mx2) {
 		else
 			ptr_i[i] = 0;
 	}
-	return *index;
+	return index;
 }
 
 template<class T>
-matrix<unsigned char>&  operator!= (const matrix<T>& mx, const matrix<T>& mx2) {
+matrix<unsigned char>  operator!= (const matrix<T>& mx, const matrix<T>& mx2) {
 	assert(mx.rows() == mx2.rows() && mx.cols() == mx2.cols());
-	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
+	matrix<unsigned char> index(mx.rows(), mx.cols());
 	const T *ptr = mx.ptr();
 	const T *ptr2 = mx2.ptr();
-	unsigned char *ptr_i = index->mutable_ptr();
+	unsigned char *ptr_i = 	index.mutable_ptr();
 	size_t m = mx.size();
 	for (size_t i=0; i < m; ++i) {
 		if (ptr[i] != ptr2[i])
@@ -825,16 +857,16 @@ matrix<unsigned char>&  operator!= (const matrix<T>& mx, const matrix<T>& mx2) {
 		else
 			ptr_i[i] = 0;
 	}
-	return *index;
+	return index;
 }
 
 template<class T>
-matrix<unsigned char>&  operator> (const matrix<T>& mx, const matrix<T>& mx2) {
+matrix<unsigned char>  operator> (const matrix<T>& mx, const matrix<T>& mx2) {
 	assert(mx.rows() == mx2.rows() && mx.cols() == mx2.cols());
-	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
+	matrix<unsigned char> index(mx.rows(), mx.cols());
 	const T *ptr = mx.ptr();
 	const T *ptr2 = mx2.ptr();
-	unsigned char *ptr_i = index->mutable_ptr();
+	unsigned char *ptr_i = 	index.mutable_ptr();
 	size_t m = mx.size();
 	for (size_t i=0; i < m; ++i) {
 		if (ptr[i] > ptr2[i])
@@ -842,15 +874,15 @@ matrix<unsigned char>&  operator> (const matrix<T>& mx, const matrix<T>& mx2) {
 		else
 			ptr_i[i] = 0;
 	}
-	return *index;
+	return index;
 }
 template<class T>
-matrix<unsigned char>&  operator>= (const matrix<T>& mx, const matrix<T>& mx2) {
+matrix<unsigned char>  operator>= (const matrix<T>& mx, const matrix<T>& mx2) {
 	assert(mx.rows() == mx2.rows() && mx.cols() == mx2.cols());
-	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
+	matrix<unsigned char> index(mx.rows(), mx.cols());
 	const T *ptr = mx.ptr();
 	const T *ptr2 = mx2.ptr();
-	unsigned char *ptr_i = index->mutable_ptr();
+	unsigned char *ptr_i = 	index.mutable_ptr();
 	size_t m = mx.size();
 	for (size_t i=0; i < m; ++i) {
 		if (ptr[i] >= ptr2[i])
@@ -858,15 +890,15 @@ matrix<unsigned char>&  operator>= (const matrix<T>& mx, const matrix<T>& mx2) {
 		else
 			ptr_i[i] = 0;
 	}
-	return *index;
+	return index;
 }
 template<class T>
-matrix<unsigned char>&  operator< (const matrix<T>& mx, const matrix<T>& mx2) {
+matrix<unsigned char>  operator< (const matrix<T>& mx, const matrix<T>& mx2) {
 	assert(mx.rows() == mx2.rows() && mx.cols() == mx2.cols());
-	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
+	matrix<unsigned char> index(mx.rows(), mx.cols());
 	const T *ptr = mx.ptr();
 	const T *ptr2 = mx2.ptr();
-	unsigned char *ptr_i = index->mutable_ptr();
+	unsigned char *ptr_i = 	index.mutable_ptr();
 	size_t m = mx.size();
 	for (size_t i=0; i < m; ++i) {
 		if (ptr[i] < ptr2[i])
@@ -874,15 +906,15 @@ matrix<unsigned char>&  operator< (const matrix<T>& mx, const matrix<T>& mx2) {
 		else
 			ptr_i[i] = 0;
 	}
-	return *index;
+	return index;
 }
 template<class T>
-matrix<unsigned char>&  operator<= (const matrix<T>& mx, const matrix<T>& mx2) {
+matrix<unsigned char>  operator<= (const matrix<T>& mx, const matrix<T>& mx2) {
 	assert(mx.rows() == mx2.rows() && mx.cols() == mx2.cols());
-	matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
+	matrix<unsigned char> index(mx.rows(), mx.cols());
 	const T *ptr = mx.ptr();
 	const T *ptr2 = mx2.ptr();
-	unsigned char *ptr_i = index->mutable_ptr();
+	unsigned char *ptr_i = 	index.mutable_ptr();
 	size_t m = mx.size();
 	for (size_t i=0; i < m; ++i) {
 		if (ptr[i] <= ptr2[i])
@@ -890,152 +922,152 @@ matrix<unsigned char>&  operator<= (const matrix<T>& mx, const matrix<T>& mx2) {
 		else
 			ptr_i[i] = 0;
 	}
-	return *index;
+	return index;
 }
 
-template<class T> matrix<T>& operator+ (const matrix<T>& A, const matrix<T>& B) {
+template<class T> matrix<T> operator+ (const matrix<T>& A, const matrix<T>& B) {
 	assert (A.cols() == B.cols() && A.rows() == B.rows());
 	const T *ptr_a, *ptr_b;
 	ptr_a = A.ptr();
 	ptr_b = B.ptr();
-  matrix<T> *C = new matrix<T>(A.rows(), A.cols());
-	T *ptr_c = C->mutable_ptr();
+  matrix<T> C(A.rows(), A.cols());
+	T *ptr_c = C.mutable_ptr();
 	size_t m = A.size();
 	for (size_t i=0; i < m; ++i)
 		ptr_c[i] = ptr_a[i] + ptr_b[i];
-  return *C;
+  return C;
 }
-template<class T> matrix<T>& operator- (const matrix<T>& A, const matrix<T>& B) {
+template<class T> matrix<T> operator- (const matrix<T>& A, const matrix<T>& B) {
 	assert (A.cols() == B.cols() && A.rows() == B.rows());
 	const T *ptr_a, *ptr_b;
 	ptr_a = A.ptr();
 	ptr_b = B.ptr();
-  matrix<T> *C = new matrix<T>(A.rows(), A.cols());
-	T *ptr_c = C->mutable_ptr();
+  matrix<T> C(A.rows(), A.cols());
+	T *ptr_c = C.mutable_ptr();
 	size_t m = A.size();
 	for (size_t i=0; i < m; ++i)
 		ptr_c[i] = ptr_a[i] - ptr_b[i];
-  return *C;
+  return C;
 }
-template<class T> matrix<T>& operator* (const matrix<T>& A, const matrix<T>& B) {
+template<class T> matrix<T> operator* (const matrix<T>& A, const matrix<T>& B) {
 	assert (A.cols() == B.cols() && A.rows() == B.rows());
 	const T *ptr_a, *ptr_b;
 	ptr_a = A.ptr();
 	ptr_b = B.ptr();
-  matrix<T> *C = new matrix<T>(A.rows(), A.cols());
-	T *ptr_c = C->mutable_ptr();
+  matrix<T> C(A.rows(), A.cols());
+	T *ptr_c = C.mutable_ptr();
 	size_t m = A.size();
 	for (size_t i=0; i < m; ++i)
 		ptr_c[i] = ptr_a[i] * ptr_b[i];
-  return *C;
+  return C;
 }
-template<class T> matrix<T>& operator/ (const matrix<T>& A, const matrix<T>& B) {
+template<class T> matrix<T> operator/ (const matrix<T>& A, const matrix<T>& B) {
 	assert (A.cols() == B.cols() && A.rows() == B.rows());
 	const T *ptr_a, *ptr_b;
 	ptr_a = A.ptr();
 	ptr_b = B.ptr();
-  matrix<T> *C = new matrix<T>(A.rows(), A.cols());
-	T *ptr_c = C->mutable_ptr();
+  matrix<T> C(A.rows(), A.cols());
+	T *ptr_c = C.mutable_ptr();
 	size_t m = A.size();
 	for (size_t i=0; i < m; ++i)
 		ptr_c[i] = ptr_a[i] / ptr_b[i];
-  return *C;
+  return C;
 }
-template<class T> matrix<T>& operator^ (const matrix<T>& A, T t) {
+template<class T> matrix<T> operator^ (const matrix<T>& A, T t) {
 	assert(A.size() > 0);
-	matrix<T> *C = new matrix<T>(A.rows(), A.cols());
-	T *ptr = C->mutable_ptr();
+	matrix<T> C(A.rows(), A.cols());
+	T *ptr = C.mutable_ptr();
 	const T *ptr_ = A.ptr();
 	size_t m = A.size();
 	for (size_t i=0; i < m; ++i)
 		ptr[i] = pow(ptr_[i], t);
-	return *C;
+	return C;
 }
 
-template<class T> matrix<T>& operator+ (const matrix<T>& A, const T t) {
+template<class T> matrix<T> operator+ (const matrix<T>& A, const T t) {
 	const T *ptr_a;
 	ptr_a = A.ptr();
-	matrix<T> *C = new matrix<T>(A.rows(), A.cols());
-	T *ptr_c = C->mutable_ptr();
+	matrix<T> C(A.rows(), A.cols());
+	T *ptr_c = C.mutable_ptr();
 	size_t m = A.size();
 	for (size_t i=0; i < m; ++i)
 		ptr_c[i] = ptr_a[i] + t;
-  return *C;
+  return C;
 }
-template<class T> matrix<T>& operator- (const matrix<T>& A, const T t) {
+template<class T> matrix<T> operator- (const matrix<T>& A, const T t) {
 	const T *ptr_a;
 	ptr_a = A.ptr();
-	matrix<T> *C = new matrix<T>(A.rows(), A.cols());
-	T *ptr_c = C->mutable_ptr();
+	matrix<T> C(A.rows(), A.cols());
+	T *ptr_c = C.mutable_ptr();
 	size_t m = A.size();
 	for (size_t i=0; i < m; ++i)
 		ptr_c[i] = ptr_a[i] - t;
-  return *C;
+  return C;
 }
-template<class T> matrix<T>& operator* (const matrix<T>& A, const T t) {
+template<class T> matrix<T> operator* (const matrix<T>& A, const T t) {
 	const T *ptr_a;
 	ptr_a = A.ptr();
-	matrix<T> *C = new matrix<T>(A.rows(), A.cols());
-	T *ptr_c = C->mutable_ptr();
+	matrix<T> C(A.rows(), A.cols());
+	T *ptr_c = C.mutable_ptr();
 	size_t m = A.size();
 	for (size_t i=0; i < m; ++i)
 		ptr_c[i] = ptr_a[i] * t;
-  return *C;
+  return C;
 }
-template<class T> matrix<T>& operator/ (const matrix<T>& A, const T t) {
+template<class T> matrix<T> operator/ (const matrix<T>& A, const T t) {
 	const T *ptr_a;
 	ptr_a = A.ptr();
-	matrix<T> *C = new matrix<T>(A.rows(), A.cols());
-	T *ptr_c = C->mutable_ptr();
+	matrix<T> C(A.rows(), A.cols());
+	T *ptr_c = C.mutable_ptr();
 	size_t m = A.size();
 	for (size_t i=0; i < m; ++i)
 		ptr_c[i] = ptr_a[i] / t;
-  return *C;
+  return C;
 }
 
-template<class T> matrix<T>& operator+ (const T t, const matrix<T>& A) {
+template<class T> matrix<T> operator+ (const T t, const matrix<T>& A) {
 	const T *ptr_a;
 	ptr_a = A.ptr();
-	matrix<T> *C = new matrix<T>(A.rows(), A.cols());
-	T *ptr_c = C->mutable_ptr();
+	matrix<T> C(A.rows(), A.cols());
+	T *ptr_c = C.mutable_ptr();
 	size_t m = A.size();
 	for (size_t i=0; i < m; ++i)
 		ptr_c[i] = ptr_a[i] + t;
-  return *C;
+  return C;
 }
-template<class T> matrix<T>& operator- (const T t, const matrix<T>& A) {
+template<class T> matrix<T> operator- (const T t, const matrix<T>& A) {
 	const T *ptr_a;
 	ptr_a = A.ptr();
-	matrix<T> *C = new matrix<T>(A.rows(), A.cols());
-	T *ptr_c = C->mutable_ptr();
+	matrix<T> C(A.rows(), A.cols());
+	T *ptr_c = C.mutable_ptr();
 	size_t m = A.size();
 	for (size_t i=0; i < m; ++i)
 		ptr_c[i] = t - ptr_a[i];
-  return *C;
+  return C;
 }
-template<class T> matrix<T>& operator* (const T t, const matrix<T>& A) {
+template<class T> matrix<T> operator* (const T t, const matrix<T>& A) {
 	const T *ptr_a;
 	ptr_a = A.ptr();
-	matrix<T> *C = new matrix<T>(A.rows(), A.cols());
-	T *ptr_c = C->mutable_ptr();
+	matrix<T> C(A.rows(), A.cols());
+	T *ptr_c = C.mutable_ptr();
 	size_t m = A.size();
 	for (size_t i=0; i < m; ++i)
 		ptr_c[i] = ptr_a[i] * t;
-  return *C;
+  return C;
 }
-template<class T> matrix<T>& operator/ (const T t, const matrix<T>& A) {
+template<class T> matrix<T> operator/ (const T t, const matrix<T>& A) {
 	const T *ptr_a;
 	ptr_a = A.ptr();
-	matrix<T> *C = new matrix<T>(A.rows(), A.cols());
-	T *ptr_c = C->mutable_ptr();
+	matrix<T> C(A.rows(), A.cols());
+	T *ptr_c = C.mutable_ptr();
 	size_t m = A.size();
 	for (size_t i=0; i < m; ++i)
 		ptr_c[i] = t / ptr_a[i];
-  return *C;
+  return C;
 }
 
 // slicing methods
-template<class T> view<T>& matrix<T>::r_ (const vector<size_t>& row_indices) {
+template<class T> view<T> matrix<T>::r_ (const vector<size_t>& row_indices) {
 	vector<size_t> cols, rows;
 	for (size_t i=0; i < num_cols; ++i)
 		cols.push_back(i);
@@ -1045,10 +1077,10 @@ template<class T> view<T>& matrix<T>::r_ (const vector<size_t>& row_indices) {
 		else
 			assert (1==0);
 	}
-	view<T> *v = new view<T>(num_rows, num_cols, cols, rows, data.data());
-	return *v;
+	view<T> v(num_rows, num_cols, cols, rows, data.data());
+	return v;
 }
-template<class T> view<T>& matrix<T>::r_ (const matrix<unsigned char>& rows_) {
+template<class T> view<T> matrix<T>::r_ (const matrix<unsigned char>& rows_) {
 	assert ((rows_.cols() == 1 && rows_.rows() == num_rows) ||
 					(rows_.rows() == 1 && rows_.cols() == num_rows));
 	vector<size_t> cols, rows;
@@ -1057,10 +1089,10 @@ template<class T> view<T>& matrix<T>::r_ (const matrix<unsigned char>& rows_) {
 	for (size_t j=0; j < rows_.size(); ++j)
 		if (rows_(0,j) == 1)
 			rows.push_back(j);
-	view<T> *v = new view<T>(num_rows, num_cols, cols, rows, data.data());
-	return *v;
+	view<T> v(num_rows, num_cols, cols, rows, data.data());
+	return v;
 }
-template<class T> view<T>& matrix<T>::r_ (int r1, int r2) {
+template<class T> view<T> matrix<T>::r_ (int r1, int r2) {
 	assert ((r1 <= r2 && r2 < num_rows) ||
 					(r1 < num_rows && r2 == matrix<T>::END) ||
 					(r1 == r2 == matrix<T>::END));
@@ -1073,10 +1105,10 @@ template<class T> view<T>& matrix<T>::r_ (int r1, int r2) {
 			r1 = num_rows-1;
 	for (size_t j=r1; j < r2; ++j)
 		rows.push_back(j);
-	view<T> *v = new view<T>(num_rows, num_cols, cols, rows, data.data());
-	return *v;
+	view<T> v(num_rows, num_cols, cols, rows, data.data());
+	return v;
 }
-template<class T> view<T>& matrix<T>::r_ (int r) {
+template<class T> view<T> matrix<T>::r_ (int r) {
 	assert (r < num_rows);
 	vector<size_t> cols, rows;
 	for (size_t i=0; i < num_cols; ++i)
@@ -1084,11 +1116,11 @@ template<class T> view<T>& matrix<T>::r_ (int r) {
 	if (r == matrix<T>::END)
 		r = num_rows - 1;
 	rows.push_back(r);
-	view<T> *v = new view<T>(num_rows, num_cols, cols, rows, data.data());
-	return *v;
+	view<T> v(num_rows, num_cols, cols, rows, data.data());
+	return v;
 }
 
-template<class T> view<T>& matrix<T>::c_ (const vector<size_t>& cols_) {
+template<class T> view<T> matrix<T>::c_ (const vector<size_t>& cols_) {
 	vector<size_t> cols, rows;
 	for (size_t i=0; i < num_rows; ++i)
 		rows.push_back(i);
@@ -1098,10 +1130,10 @@ template<class T> view<T>& matrix<T>::c_ (const vector<size_t>& cols_) {
 		else
 			assert (1==0);
 	}
-	view<T> *v = new view<T>(num_rows, num_cols, cols, rows, data.data());
-	return *v;
+	view<T> v(num_rows, num_cols, cols, rows, data.data());
+	return v;
 }
-template<class T> view<T>& matrix<T>::c_ (const matrix<unsigned char>& cols_) {
+template<class T> view<T> matrix<T>::c_ (const matrix<unsigned char>& cols_) {
 	assert (cols_.rows() == 1 && cols_.cols() == num_cols);
 	vector<size_t> cols, rows;
 	for (size_t i=0; i < num_rows; ++i)
@@ -1109,10 +1141,10 @@ template<class T> view<T>& matrix<T>::c_ (const matrix<unsigned char>& cols_) {
 	for (size_t j=0; j < cols_.size(); ++j)
 		if (cols_(0,j) == 1)
 			cols.push_back(j);
-	view<T> *v = new view<T>(num_rows, num_cols, cols, rows, data.data());
-	return *v;
+	view<T> v(num_rows, num_cols, cols, rows, data.data());
+	return v;
 }
-template<class T> view<T>& matrix<T>::c_ (int c1, int c2) {
+template<class T> view<T> matrix<T>::c_ (int c1, int c2) {
 	assert ((c1 <= c2 && c2 < num_rows) ||
 					(c1 < num_rows && c2 == matrix<T>::END) ||
 					(c1 == c2 == matrix<T>::END));
@@ -1125,10 +1157,10 @@ template<class T> view<T>& matrix<T>::c_ (int c1, int c2) {
 			c1 = num_cols - 1;
 	for (size_t j=c1; j < c2; ++j)
 		cols.push_back(j);
-	view<T> *v = new view<T>(num_rows, num_cols, cols, rows, data.data());
-	return *v;
+	view<T> v(num_rows, num_cols, cols, rows, data.data());
+	return v;
 }
-template<class T> view<T>& matrix<T>::c_ (int c) {
+template<class T> view<T> matrix<T>::c_ (int c) {
 	assert (c < num_rows);
 	vector<size_t> cols, rows;
 	for (size_t i=0; i < num_rows; ++i)
@@ -1136,11 +1168,11 @@ template<class T> view<T>& matrix<T>::c_ (int c) {
 	if (c == matrix<T>::END)
 		c = num_cols - 1;
 	cols.push_back(c);
-	view<T> *v = new view<T>(num_rows, num_cols, cols, rows, data.data());
-	return *v;
+	view<T> v(num_rows, num_cols, cols, rows, data.data());
+	return v;
 }
 
-template<class T> view<T>& matrix<T>::grid (const matrix<unsigned char>& rows_, const matrix<unsigned char>& cols_) {
+template<class T> view<T> matrix<T>::grid (const matrix<unsigned char>& rows_, const matrix<unsigned char>& cols_) {
 	assert (rows_.rows() == num_rows && rows_.cols() == 1 && cols_.rows() == 1 && cols_.cols() == num_cols);
 	vector<size_t> cols, rows;
 	for (size_t i=0; i < rows_.size(); ++i)
@@ -1149,11 +1181,11 @@ template<class T> view<T>& matrix<T>::grid (const matrix<unsigned char>& rows_, 
 	for (size_t j=0; j < cols_.size(); ++j)
 		if (cols_(j,0) == 1)
 			cols.push_back(j);
-	view<T> *v = new view<T>(num_rows, num_cols, cols, rows, data.data());
-	return *v;
+	view<T> v(num_rows, num_cols, cols, rows, data.data());
+	return v;
 }
 
-template<class T> view<T>& matrix<T>::grid (const vector<size_t>& rows_, const std::vector<size_t>& cols_) {
+template<class T> view<T> matrix<T>::grid (const vector<size_t>& rows_, const std::vector<size_t>& cols_) {
 	assert(rows_.size() > 0 && cols_.size() > 0);
 	vector<size_t> cols, rows;
 	for (size_t i=0; i < rows_.size(); ++i) {
@@ -1168,10 +1200,10 @@ template<class T> view<T>& matrix<T>::grid (const vector<size_t>& rows_, const s
 		else
 			assert (1==0);
 	}
-	view<T> *v = new view<T>(num_rows, num_cols, cols, rows, data.data());
-	return *v;
+	view<T> v(num_rows, num_cols, cols, rows, data.data());
+	return v;
 }
-template<class T> view<T>& matrix<T>::area (int r1, int r2, int c1, int c2) {
+template<class T> view<T> matrix<T>::area (int r1, int r2, int c1, int c2) {
 	assert ((r1 <= r2 && r2 < num_rows) ||
 					(r1 < num_rows && r2 == matrix<T>::END) ||
 					(r1 == r2 && r2 == matrix<T>::END) ||
@@ -1191,7 +1223,7 @@ template<class T> view<T>& matrix<T>::area (int r1, int r2, int c1, int c2) {
 			c1 = num_cols - 1;
 	for (size_t j=c1; j <= c2; ++j)
 		cols.push_back(j);
-	view<T> *v = new view<T>(num_rows, num_cols, cols, rows, data.data());
-	return *v;
+	view<T> v(num_rows, num_cols, cols, rows, data.data());
+	return v;
 }
 #endif
