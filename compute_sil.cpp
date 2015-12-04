@@ -31,7 +31,7 @@ static inline bool do_file_exist (const std::string& name) {
         return false;
 }
 
-matrix<int>& load_labels (const char *labelfile) {
+matrix<int> load_labels (const char *labelfile) {
 	vector< vector<int> > clusters;
 	ifstream file(labelfile);
 	string line;
@@ -48,41 +48,31 @@ matrix<int>& load_labels (const char *labelfile) {
 		}
 		clusters.push_back(indices);
 	}
-	matrix<int>* labels = new matrix<int>(total_points, 1);
+	matrix<int> labels(total_points, 1);
 	for (int i=0; i < clusters.size(); ++i)
 		for (int j=0; j < clusters[i].size(); ++j)
-			(*labels)(clusters[i][j], 0) = i;
-	return *labels;
+			labels(clusters[i][j], 0) = i;
+	return labels;
 }
 
-matrix<float>& compute_cluster_centers (matrix<float>& X, matrix<int>& y) {
+matrix<float> compute_cluster_centers (matrix<float>& X, matrix<int>& y) {
 	assert(X.rows() == y.size());
 	int num_classes = y.max() + 1;
-	matrix<float>* centers = new matrix<float>(num_classes, X.cols());
+	matrix<float> centers(num_classes, X.cols());
 	size_t m = X.rows();
 	for (int i=0; i < num_classes; ++i) {
-		// cout << "computing cluster center #" << i << endl;
-		centers->r_(i) = X.r_(y == i).mean(0);
+		centers.r_(i) = X.r_(y == i).mean(0);
 	}
-	return *centers;
+	return centers;
 }
 matrix<float>& compute_coefficients (matrix<float>& X, matrix<int>& y, matrix<float>& centers) {
 	int num_clusters = y.max() + 1;
-	// copy original data into submatrices to avoid further computational cost
-	// vector<matrix<float>* > clusters;
-	// cout << "Grouping cluster data..." << endl;
-	// for (int i=0; i < num_clusters; ++i) {
-	// 	clusters.push_back(&(X.r_(y == i).detach()));
-	// }
-	// delete &X;
-	matrix<float> *avg_coeffs = new matrix<float>(1, num_clusters);
+	matrix<float> avg_coeffs(1, num_clusters);
 	for (int i=0; i < num_clusters; ++i) {
 		cout << "Computing cluster #" << i << "..." << endl;
-		matrix<unsigned char>& ixx = y == i;
-		view<float>& cluster_view = X.r_(y == i);
-		matrix<float>& thiscluster = cluster_view.detach();
-		matrix<float>& inter_dist = cuda_pairwise_distance (thiscluster, centers);
-		matrix<size_t>& sorted_ix = matrix_argsort(inter_dist, matrix<size_t>::SORT_ROWS);
+		matrix<float> thiscluster = X.r_(y == i).detach();
+		matrix<float> inter_dist = cuda_pairwise_distance (thiscluster, centers);
+		matrix<size_t> sorted_ix = matrix_argsort(inter_dist, matrix<size_t>::SORT_ROWS);
 		matrix<size_t> nearest_clusters(1, thiscluster.rows());
 		for (int j=0; j < sorted_ix.rows(); ++j) {
 			if (sorted_ix(j,0) != i)
@@ -97,58 +87,37 @@ matrix<float>& compute_coefficients (matrix<float>& X, matrix<int>& y, matrix<fl
 		unique_nearest_clusters.resize(std::distance(unique_nearest_clusters.begin(), it) );
 
 		int count = 0;
-		matrix<float>& intra_dist = cuda_pairwise_distance (thiscluster);
+		matrix<float> intra_dist = cuda_pairwise_distance (thiscluster);
 		matrix<float> coeffs(1, nearest_clusters.size());
 
 		for (size_t k=0; k < unique_nearest_clusters.size(); ++k) {
 			size_t next_cluster = unique_nearest_clusters[k];
-			matrix<unsigned char>& ix = y == (int)next_cluster;
-			view<float>& subview = X.r_(ix);
-			matrix<float>& subcluster = subview.detach();
+			matrix<float> subcluster = X.r_(y == (int)next_cluster).detach();
 
-			matrix<unsigned char>& bool_ix = nearest_clusters == next_cluster;
-			matrix<float>& vecs = thiscluster.r_(bool_ix).detach();
-			matrix<float>& subinter = cuda_pairwise_distance(vecs, subcluster);
-			matrix<float>& mean_b = subinter.mean(1);
-			view<float>& subintra = intra_dist.r_(bool_ix);
-			matrix<float>& mean_a = subintra.mean(1);
+			matrix<unsigned char> bool_ix = nearest_clusters == next_cluster;
+			matrix<float> vecs = thiscluster.r_(bool_ix).detach();
+			matrix<float> mean_b = cuda_pairwise_distance(vecs, subcluster);.mean(1);
+			matrix<float> mean_a = intra_dist.r_(bool_ix).mean(1);
 			assert(mean_a.size() == mean_b.size() && vecs.rows() == mean_a.size());
 			for (int j=0; j < mean_a.rows(); ++j) {
 				float coeff = (mean_b(j,0) - mean_a(j,0))/std::max(mean_b(j,0), mean_a(j,0));
 				coeffs(0, count++) = coeff;
 			}
-			delete &subcluster;
-			delete &bool_ix;
-			delete &vecs;
-			delete &mean_b;
-			delete &mean_a;
-			delete &ix;
-			delete &subview;
-			delete &subinter;
-			delete &subintra;
 		}
 		assert(count == coeffs.size());
-		(*avg_coeffs)(0, i) = coeffs.mean();
-		cout << "coefficient #" << i << ": " << (*avg_coeffs)(0,i) << endl;
-		delete &thiscluster;
-		delete &intra_dist;
-		delete &inter_dist;
-		delete &sorted_ix;
-		delete &cluster_view;
-		delete &ixx;
+		avg_coeffs(0, i) = coeffs.mean();
+		cout << "coefficient #" << i << ": " << avg_coeffs(0,i) << endl;
 	}
-	return (*avg_coeffs);
+	return avg_coeffs;
 }
 void csil () {
 	cout << "Loading features..." << endl;
-	matrix<float>& X = matrix<float>::load("../dat/20m_signatures_random.caffe.256", 18389592, 256);
+	matrix<float> X = matrix<float>::load("../dat/20m_signatures_random.caffe.256", 18389592, 256);
 	X = X.c_(0, 16).detach();
 	cout << "...has dimension (" << X.rows() << ", " << X.cols() << ")" << endl;
 	cout << "Loading labels..." << endl;
-	matrix<int>& y = load_labels("../dat/cluster_20msig_5kcenter_random.lst");
+	matrix<int> y = load_labels("../dat/cluster_20msig_5kcenter_random.lst");
 	cout << "...has dimension (" << y.rows() << ", " << y.cols() << ")" << endl;
-	view<int> yy = y.r_(std::vector<size_t>({5176, 10577, 10940, 11167, 15510, 15914}));
-	SHOW("y[:6]", yy);
 	matrix<float> centers;
 	if (do_file_exist(string("../dat/centers.16"))) {
 		cout << "Loading centers..." << endl;
@@ -160,12 +129,9 @@ void csil () {
 		matrix<float>::dump("../dat/centers.16", centers);
 	}
 	cout << "Computing Silhouette coefficients..." << endl;
-	matrix<float>& coeffs = compute_coefficients (X, y, centers);
+	matrix<float> coeffs = compute_coefficients (X, y, centers);
 	matrix<float>::dump("../dat/coeffs.bin", coeffs);
 	cout << "Dumped results to ../dat/coeffs.bin. DONE.";
-	delete &X;
-	delete &y;
-	delete &coeffs;
 }
 // void select_training_data () {
 // 	matrix<float>& coeffs = matrix<float>::load("../dat/coeffs.bin", 5000, 1);

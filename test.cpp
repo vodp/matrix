@@ -29,18 +29,37 @@
 // 	SHOW("f", f);
 // 	SHOW("c", c);
 // }
+matrix<float> f() {
+	matrix<float> a(1,2);
+	return a;
+}
+matrix<float> g() {
+	matrix<float> *b = new matrix<float>(1,2);
+	return *b;
+}
+matrix<float>& k() {
+	matrix<float> *b = new matrix<float>(1,2);
+	return *b;
+}
+
+void test_3() {
+	matrix<float> a;
+	a = f();
+	cout << "--" << endl;
+	a = g();
+	cout << "--" << endl;
+	a = a.mean(1);
+}
 void test_2() {
 	matrix<float> x(2000, 3000), y(2000, 3000);
 	x.fill(2.0f); y.fill(3.0f);
-	// while (1) {
-		view<float> zz = x.r_(y.c_(0,1) == 3.0f);
-		cout << "--" << endl;
-		matrix<float> z;
-		cout << "##" << endl;
-		z = zz.mean(1);
-		// matrix<float> z = x.r_(y.c_(0,1) == 3.0f).mean(1);
-		// z = z.scale(2.0f);
-	// }
+	view<float> zz = x.r_(y.c_(0,1) == 3.0f);
+	cout << "--" << endl;
+	matrix<float> z(1,2);
+	cout << "##" << endl;
+	z = x.mean(1);
+	// matrix<float> z = x.r_(y.c_(0,1) == 3.0f).mean(1);
+	// z = z.scale(2.0f);
 }
 int main()
 {
@@ -51,5 +70,5 @@ int main()
 	// csil();
 	// csil_sanitycheck();
 	// test_detach();
-	test_2();
+	test_3();
 }

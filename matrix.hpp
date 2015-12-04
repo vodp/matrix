@@ -63,7 +63,7 @@ public:
 		matrix<T> max (int axis) const;
 		matrix<T> min (int axis) const;
 		matrix<T> sum (int axis) const;
-		matrix<T> mean (int axis) const;
+		matrix<T> mean (int axis) ;
 
 		// fillers
 		matrix<T>& fill (T value);
@@ -212,13 +212,11 @@ matrix<float> cuda_pairwise_distance (const matrix<float>& A, const matrix<float
 matrix<float> cuda_pairwise_distance (const matrix<float>& A);
 ////////////////////////////////////////////////////////////////////////////////
 template<class T> matrix<T>::matrix (const matrix<T>& mx) {
-	cout << "copy-tor" << endl;
 	this->num_rows = mx.num_rows;
 	this->num_cols = mx.num_cols;
 	this->data = mx.data;
 }
 template<class T> matrix<T>::matrix (matrix<T>&& mx) {
-	cout << "move-tor" << endl;
 	num_rows = mx.num_rows;
 	num_cols = mx.num_cols;
 	data = std::move(mx.data);
@@ -239,7 +237,6 @@ template<class T> matrix<T>::matrix (const view<T>& mx) {
 			data.push_back(mx(j,i));
 }
 template<class T> matrix<T>& matrix<T>::operator= (const matrix<T>& mx) {
-	cout << "copy-assign" << endl;
 	if (this != &mx) {
 		if (this->num_rows != mx.rows() || this->num_cols != mx.cols()) {
 			this->data.clear();
@@ -253,7 +250,6 @@ template<class T> matrix<T>& matrix<T>::operator= (const matrix<T>& mx) {
 	return *this;
 }
 template<class T> matrix<T>& matrix<T>::operator= (matrix<T>&& mx) {
-	cout << "move-asign" << endl;
 	if (this != &mx) {
 		data.clear();
 		num_rows = mx.num_rows;
@@ -381,7 +377,7 @@ template<class T> T matrix<T>::mean () const {
 template<class T> matrix<T> matrix<T>::max (int axis) const {
 	assert (axis == 1 || axis == 0);
 	if (axis == 0) {
-		matrix<T> *vector = new matrix<T>(1, num_cols);
+		matrix<T> vector(1, num_cols);
 		const T *ptr = data.data();
 		for (size_t j=0; j < num_cols; ++j) {
 			T max_value = numeric_limits<T>::min();
@@ -389,11 +385,11 @@ template<class T> matrix<T> matrix<T>::max (int axis) const {
 				if (max_value < ptr[i*num_cols + j])
 					max_value = ptr[i*num_cols + j];
 			}
-			(*vector)(0,j) = max_value;
+			vector(0,j) = max_value;
 		}
-		return *vector;
+		return vector;
 	} else {
-		matrix<T> *vector = new matrix<T>(num_rows, 1);
+		matrix<T> vector(num_rows, 1);
 		const T *ptr = data.data();
 		for (size_t i=0; i < num_rows; ++i) {
 			T max_value = numeric_limits<T>::min();
@@ -401,15 +397,15 @@ template<class T> matrix<T> matrix<T>::max (int axis) const {
 				if (max_value < ptr[i*num_cols + j])
 					max_value = ptr[i*num_cols + j];
 			}
-			(*vector)(i,0) = max_value;
+			vector(i,0) = max_value;
 		}
-		return *vector;
+		return vector;
 	}
 }
 template<class T> matrix<T> matrix<T>::min (int axis) const {
 	assert (axis == 1 || axis == 0);
 	if (axis == 0) {
-		matrix<T> *vector = new matrix<T>(1, num_cols);
+		matrix<T> vector(1, num_cols);
 		const T *ptr = data.data();
 		for (size_t j=0; j < num_cols; ++j) {
 			T min_value = numeric_limits<T>::max();
@@ -417,11 +413,11 @@ template<class T> matrix<T> matrix<T>::min (int axis) const {
 				if (min_value > ptr[i*num_cols + j])
 					min_value = ptr[i*num_cols + j];
 			}
-			(*vector)(0,j) = min_value;
+			vector(0,j) = min_value;
 		}
-		return *vector;
+		return vector;
 	} else {
-		matrix<T> *vector = new matrix<T>(num_rows, 1);
+		matrix<T> vector(num_rows, 1);
 		const T *ptr = data.data();
 		for (size_t i=0; i < num_rows; ++i) {
 			T min_value = numeric_limits<T>::max();
@@ -429,58 +425,54 @@ template<class T> matrix<T> matrix<T>::min (int axis) const {
 				if (min_value > ptr[i*num_cols + j])
 					min_value = ptr[i*num_cols + j];
 			}
-			(*vector)(i,0) = min_value;
+			vector(i,0) = min_value;
 		}
-		return *vector;
+		return vector;
 	}
 }
 template<class T> matrix<T> matrix<T>::sum (int axis) const {
 	assert (axis == 1 || axis == 0);
+	matrix<T> mx(axis == 0 ? 1 : num_rows, axis == 1 ? num_cols : 1);
 	if (axis == 0) {
-		matrix<T> *vector = new matrix<T>(1, num_cols);
 		const T *ptr = data.data();
 		for (size_t j=0; j < num_cols; ++j) {
 			T sum_value = 0.0;
 			for (size_t i=0; i < num_rows; ++i)
 				sum_value += ptr[i*num_cols + j];
-			(*vector)(0,j) = sum_value;
+			vector(0,j) = sum_value;
 		}
-		return *vector;
 	} else {
-		matrix<T> *vector = new matrix<T>(num_rows, 1);
 		const T *ptr = data.data();
 		for (size_t i=0; i < num_rows; ++i) {
 			T sum_value = 0.0;
 			for (size_t j=0; j < num_cols; ++j)
 				sum_value += ptr[i*num_cols + j];
-			(*vector)(i,0) = sum_value;
+			vector(i,0) = sum_value;
 		}
-		return *vector;
 	}
+	return vector;
 }
-template<class T> matrix<T> matrix<T>::mean (int axis) const {
+template<class T> matrix<T> matrix<T>::mean (int axis)  {
 	assert (axis == 1 || axis == 0);
+	matrix<T> mx(axis == 0 ? 1 : num_rows, axis == 1 ? num_cols : 1);
 	if (axis == 0) {
-		matrix<T> *vector = new matrix<T>(1, num_cols);
 		const T *ptr = data.data();
 		for (size_t j=0; j < num_cols; ++j) {
 			T sum_value = 0.0;
 			for (size_t i=0; i < num_rows; ++i)
 				sum_value += ptr[i*num_cols + j];
-			(*vector)(0,j) = sum_value/num_rows;
+			mx(0,j) = sum_value/num_rows;
 		}
-		return *vector;
 	} else {
-		matrix<T> *vector = new matrix<T>(num_rows, 1);
 		const T *ptr = data.data();
 		for (size_t i=0; i < num_rows; ++i) {
 			T sum_value = 0.0;
 			for (size_t j=0; j < num_cols; ++j)
 				sum_value += ptr[i*num_cols + j];
-			(*vector)(i,0) = sum_value/num_cols;
+			mx(i,0) = sum_value/num_cols;
 		}
-		return *vector;
 	}
+	return mx;
 }
 template<class T> matrix<T>& matrix<T>::add(const matrix<T>& mx) {
 	assert(mx.rows() == this->rows() && mx.cols() == this->cols());
@@ -562,10 +554,10 @@ template<class T> matrix<T>& matrix<T>::size(size_t rows, size_t cols) {
 }
 
 template<class T> matrix<size_t> matrix<T>::shape() const {
-	matrix<size_t>* mx = new matrix<size_t>(1,2);
-	(*mx)(0,0) = num_rows;
-	(*mx)(0,1) = num_cols;
-	return *mx;
+	matrix<size_t> mx(1,2);
+	mx(0,0) = num_rows;
+	mx(0,1) = num_cols;
+	return mx;
 }
 template<class T> size_t matrix<T>::shape(int axis) const{
 	assert(axis == 0 || axis == 1);
@@ -623,9 +615,9 @@ template<class T> matrix<T> matrix<T>::load (const char *filename, size_t rows, 
 	T *memblock = new T[array_len];
 	file.read((char*)memblock, size);
 	file.close();
-	matrix<T>* data = new matrix<T>(memblock, rows, cols);
+	matrix<T> data = (memblock, rows, cols);
 	delete memblock;
-	return *data;
+	return data;
 }
 
 template<class T>
@@ -660,8 +652,6 @@ ostream& operator<< (ostream& os, const matrix<T>& mx) {
 template<class T>
 matrix<unsigned char> operator== (const matrix<T>& mx, const T value) {
 	matrix<unsigned char> index(mx.rows(), mx.cols());
-	// vector<unsigned char> index(mx.size());
-	// matrix<unsigned char> *index = new matrix<unsigned char>(mx.rows(), mx.cols());
 	const T *ptr = mx.ptr();
 	unsigned char *ptr_i = index.mutable_ptr();
 	size_t m = mx.size();
@@ -671,7 +661,7 @@ matrix<unsigned char> operator== (const matrix<T>& mx, const T value) {
 		else
 			ptr_i[i] = 0;
 	}
-	return index;//matrix<unsigned char>(index, mx.rows(), mx.cols());
+	return index;
 }
 
 template<class T>
