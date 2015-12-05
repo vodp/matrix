@@ -27,10 +27,6 @@ void cuda_init (int& dev_id) {
   cout << "GPU device " << dev_id << " " << device_prop.name << " with compute capability " << device_prop.major << "." << device_prop.minor << endl;
 }
 
-// void clear_cuda (cublasHandle_t& handle) {
-//   cublasDestroy(handle);
-// }
-
 matrix<float> cuda_matrix_dot (const matrix<float>& A, const matrix<float>& B) {
   assert(A.cols() == B.rows());
   int M = A.rows();

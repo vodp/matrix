@@ -47,11 +47,6 @@ public:
 		size_t shape(int axis) const;
 		matrix<size_t> shape() const;
 
-		// arimethic operators
-		matrix<T>& add(T t);
-		matrix<T>& scale(T t);
-		matrix<T>& power(T t);
-
 		matrix<T>& t ();
 		matrix<T>& reshape (size_t a1, size_t a2);
 		matrix<T>& size(size_t rows, size_t cols);
@@ -60,6 +55,7 @@ public:
 		T min () const;
 		T sum () const;
 		T mean() const;
+
 		matrix<T> max (int axis) const;
 		matrix<T> min (int axis) const;
 		matrix<T> sum (int axis) const;
@@ -81,17 +77,37 @@ public:
 		view<T> c_ (int c1, int c2);
 		view<T> c_ (int c);
 
-		view<T> grid (const matrix<unsigned char>& rows, const matrix<unsigned char>& cols);
-		view<T> grid (const vector<size_t>& rows, const std::vector<size_t>& cols);
-		view<T> area (int r1, int r2, int c1, int c2);
+		view<T> rc_ (int r1, int r2, int c1, int c2);
+		view<T> rc_ (const vector<size_t>& rows, const vector<size_t>& cols);
+		view<T> rc_ (const matrix<unsigned char>& rows, const matrix<unsigned char>& cols);
 
 		// assignment operators
 		matrix<T>& operator= (matrix<T>&& mx);
 		matrix<T>& operator= (const matrix<T>& mx);
 		matrix<T>& operator= (const view<T>& mx);
-		matrix<T>& operator= (const T t);
+		matrix<T>& operator= (double t);
+		matrix<T>& operator= (float t);
+		matrix<T>& operator= (int t);
+		matrix<T>& operator= (char t);
+		matrix<T>& operator= (long t);
 
 		// element-wise operators
+		// arimethic operators
+		matrix<T>& add(float t);
+		matrix<T>& add(double t);
+		matrix<T>& add(int t);
+		matrix<T>& add(long t);
+		matrix<T>& add(char t);
+		matrix<T>& mul(float t);
+		matrix<T>& mul(double t);
+		matrix<T>& mul(int t);
+		matrix<T>& mul(long t);
+		matrix<T>& mul(char t);
+		matrix<T>& power(float t);
+		matrix<T>& power(double t);
+		matrix<T>& power(int t);
+		matrix<T>& power(long t);
+		matrix<T>& power(char t);
 		matrix<T>& add(const matrix<T>& mx);
 		matrix<T>& mul(const matrix<T>& mx);
 		matrix<T>& add(const view<T>& mx);
@@ -114,6 +130,8 @@ public:
 		static matrix<T> load (const char* filename, size_t rows, size_t cols);
 		static void 			dump (const char* filename, matrix<T>& mx);
 		static matrix<T> tile (const matrix<T>& pattern, size_t nrows, size_t ncols);
+		static matrix<T> zeros (size_t nrows, size_t ncols);
+		static matrix<T> ones (size_t nrows, size_t ncols);
 
 		// some constants
 		static int const END;
@@ -242,11 +260,39 @@ template<class T> matrix<T>& matrix<T>::operator= (const matrix<T>& mx) {
 			this->data.clear();
 			this->num_cols = mx.cols();
 			this->num_rows = mx.rows();
-			// this->data.resize(mx.size());
 		}
 		data = mx.data;
-		// copy(mx.ptr(), mx.ptr() + mx.size(), data.data());
 	}
+	return *this;
+}
+template<class T> matrix<T>& matrix<T>::operator= (double t) {
+	T *ptr = data.data();
+	for (size_t i=0; i < data.size(); ++i)
+		ptr[i] = t;
+	return *this;
+}
+template<class T> matrix<T>& matrix<T>::operator= (float t) {
+	T *ptr = data.data();
+	for (size_t i=0; i < data.size(); ++i)
+		ptr[i] = t;
+	return *this;
+}
+template<class T> matrix<T>& matrix<T>::operator= (int t) {
+	T *ptr = data.data();
+	for (size_t i=0; i < data.size(); ++i)
+		ptr[i] = t;
+	return *this;
+}
+template<class T> matrix<T>& matrix<T>::operator= (char t) {
+	T *ptr = data.data();
+	for (size_t i=0; i < data.size(); ++i)
+		ptr[i] = t;
+	return *this;
+}
+template<class T> matrix<T>& matrix<T>::operator= (long t) {
+	T *ptr = data.data();
+	for (size_t i=0; i < data.size(); ++i)
+		ptr[i] = t;
 	return *this;
 }
 template<class T> matrix<T>& matrix<T>::operator= (matrix<T>&& mx) {
@@ -320,24 +366,81 @@ template<class T> matrix<T>& matrix<T>::randn () {
 	return *this;
 }
 
-template<class T> matrix<T>& matrix<T>::add(T t) {
+template<class T> matrix<T>& matrix<T>::add(float t) {
 	for (size_t i=0; i < data.size(); ++i)
 		data[i] += t;
 	return *this;
 }
-
-template<class T> matrix<T>& matrix<T>::scale(T t) {
+template<class T> matrix<T>& matrix<T>::add(double t) {
+	for (size_t i=0; i < data.size(); ++i)
+		data[i] += t;
+	return *this;
+}
+template<class T> matrix<T>& matrix<T>::add(int t) {
+	for (size_t i=0; i < data.size(); ++i)
+		data[i] += t;
+	return *this;
+}
+template<class T> matrix<T>& matrix<T>::add(long t) {
+	for (size_t i=0; i < data.size(); ++i)
+		data[i] += t;
+	return *this;
+}
+template<class T> matrix<T>& matrix<T>::add(char t) {
+	for (size_t i=0; i < data.size(); ++i)
+		data[i] += t;
+	return *this;
+}
+template<class T> matrix<T>& matrix<T>::mul(float t) {
 	for (size_t i=0; i < data.size(); ++i)
 		data[i] *= t;
 	return *this;
 }
-
-template<class T> matrix<T>& matrix<T>::power(T t) {
+template<class T> matrix<T>& matrix<T>::mul(double t) {
+	for (size_t i=0; i < data.size(); ++i)
+		data[i] *= t;
+	return *this;
+}
+template<class T> matrix<T>& matrix<T>::mul(int t) {
+	for (size_t i=0; i < data.size(); ++i)
+		data[i] *= t;
+	return *this;
+}
+template<class T> matrix<T>& matrix<T>::mul(long t) {
+	for (size_t i=0; i < data.size(); ++i)
+		data[i] *= t;
+	return *this;
+}
+template<class T> matrix<T>& matrix<T>::mul(char t) {
+	for (size_t i=0; i < data.size(); ++i)
+		data[i] *= t;
+	return *this;
+}
+template<class T> matrix<T>& matrix<T>::power(float t) {
 	for (size_t i=-0; i < data.size(); ++i)
 		data[i] = pow(data[i], float(t));
 	return *this;
 }
-
+template<class T> matrix<T>& matrix<T>::power(double t) {
+	for (size_t i=-0; i < data.size(); ++i)
+		data[i] = pow(data[i], float(t));
+	return *this;
+}
+template<class T> matrix<T>& matrix<T>::power(int t) {
+	for (size_t i=-0; i < data.size(); ++i)
+		data[i] = pow(data[i], float(t));
+	return *this;
+}
+template<class T> matrix<T>& matrix<T>::power(long t) {
+	for (size_t i=-0; i < data.size(); ++i)
+		data[i] = pow(data[i], float(t));
+	return *this;
+}
+template<class T> matrix<T>& matrix<T>::power(char t) {
+	for (size_t i=-0; i < data.size(); ++i)
+		data[i] = pow(data[i], float(t));
+	return *this;
+}
 template<class T> T matrix<T>::min () const {
 	T min_value = numeric_limits<T>::max();
 	const T *ptr = data.data();
@@ -376,8 +479,8 @@ template<class T> T matrix<T>::mean () const {
 }
 template<class T> matrix<T> matrix<T>::max (int axis) const {
 	assert (axis == 1 || axis == 0);
+	matrix<T> mx(axis == 0 ? 1 : num_rows, axis == 1 ? num_cols : 1);
 	if (axis == 0) {
-		matrix<T> vector(1, num_cols);
 		const T *ptr = data.data();
 		for (size_t j=0; j < num_cols; ++j) {
 			T max_value = numeric_limits<T>::min();
@@ -385,11 +488,9 @@ template<class T> matrix<T> matrix<T>::max (int axis) const {
 				if (max_value < ptr[i*num_cols + j])
 					max_value = ptr[i*num_cols + j];
 			}
-			vector(0,j) = max_value;
+			mx(0,j) = max_value;
 		}
-		return vector;
 	} else {
-		matrix<T> vector(num_rows, 1);
 		const T *ptr = data.data();
 		for (size_t i=0; i < num_rows; ++i) {
 			T max_value = numeric_limits<T>::min();
@@ -397,15 +498,15 @@ template<class T> matrix<T> matrix<T>::max (int axis) const {
 				if (max_value < ptr[i*num_cols + j])
 					max_value = ptr[i*num_cols + j];
 			}
-			vector(i,0) = max_value;
+			mx(i,0) = max_value;
 		}
-		return vector;
 	}
+	return mx;
 }
 template<class T> matrix<T> matrix<T>::min (int axis) const {
 	assert (axis == 1 || axis == 0);
+	matrix<T> mx(axis == 0 ? 1 : num_rows, axis == 1 ? num_cols : 1);
 	if (axis == 0) {
-		matrix<T> vector(1, num_cols);
 		const T *ptr = data.data();
 		for (size_t j=0; j < num_cols; ++j) {
 			T min_value = numeric_limits<T>::max();
@@ -413,11 +514,9 @@ template<class T> matrix<T> matrix<T>::min (int axis) const {
 				if (min_value > ptr[i*num_cols + j])
 					min_value = ptr[i*num_cols + j];
 			}
-			vector(0,j) = min_value;
+			mx(0,j) = min_value;
 		}
-		return vector;
 	} else {
-		matrix<T> vector(num_rows, 1);
 		const T *ptr = data.data();
 		for (size_t i=0; i < num_rows; ++i) {
 			T min_value = numeric_limits<T>::max();
@@ -425,10 +524,10 @@ template<class T> matrix<T> matrix<T>::min (int axis) const {
 				if (min_value > ptr[i*num_cols + j])
 					min_value = ptr[i*num_cols + j];
 			}
-			vector(i,0) = min_value;
+			mx(i,0) = min_value;
 		}
-		return vector;
 	}
+	return mx;
 }
 template<class T> matrix<T> matrix<T>::sum (int axis) const {
 	assert (axis == 1 || axis == 0);
@@ -439,7 +538,7 @@ template<class T> matrix<T> matrix<T>::sum (int axis) const {
 			T sum_value = 0.0;
 			for (size_t i=0; i < num_rows; ++i)
 				sum_value += ptr[i*num_cols + j];
-			vector(0,j) = sum_value;
+			mx(0,j) = sum_value;
 		}
 	} else {
 		const T *ptr = data.data();
@@ -447,10 +546,10 @@ template<class T> matrix<T> matrix<T>::sum (int axis) const {
 			T sum_value = 0.0;
 			for (size_t j=0; j < num_cols; ++j)
 				sum_value += ptr[i*num_cols + j];
-			vector(i,0) = sum_value;
+			mx(i,0) = sum_value;
 		}
 	}
-	return vector;
+	return mx;
 }
 template<class T> matrix<T> matrix<T>::mean (int axis)  {
 	assert (axis == 1 || axis == 0);
@@ -488,7 +587,7 @@ template<class T> matrix<T>& matrix<T>::add(const view<T>& mx) {
 	T *ptrd = data.data();
 	for (size_t i=0; i < num_rows; ++i)
 		for (size_t j=0; j < num_cols; ++j)
-			ptrd[i*num_cols + j] = mx(i,j);
+			ptrd[i*num_cols + j] += mx(i,j);
 	return *this;
 }
 template<class T> matrix<T>& matrix<T>::mul(const matrix<T>& mx) {
@@ -506,6 +605,74 @@ template<class T> matrix<T>& matrix<T>::mul(const view<T>& mx) {
 	for (size_t i=0; i < num_rows; ++i)
 		for (size_t j=0; j < num_cols; ++j)
 			ptrd[i*num_cols + j] *= mx(i,j);
+	return *this;
+}
+template<class T> matrix<T>& matrix<T>::operator+= (const matrix<T>& mx) {
+	assert(mx.rows() == num_rows && mx.cols() == num_cols);
+	const T *ptrs = mx.ptr();
+	T *ptrd = data.data();
+	size_t m = mx.size();
+	for (size_t i = 0; i < m; ++i)
+		ptrd[i] += ptrs[i];
+	return *this;
+}
+template<class T> matrix<T>& matrix<T>::operator-= (const matrix<T>& mx) {
+	assert(mx.rows() == num_rows && mx.cols() == num_cols);
+	const T *ptrs = mx.ptr();
+	T *ptrd = data.data();
+	size_t m = mx.size();
+	for (size_t i = 0; i < m; ++i)
+		ptrd[i] -= ptrs[i];
+	return *this;
+}
+template<class T> matrix<T>& matrix<T>::operator*= (const matrix<T>& mx) {
+	assert(mx.rows() == num_rows && mx.cols() == num_cols);
+	const T *ptrs = mx.ptr();
+	T *ptrd = data.data();
+	size_t m = mx.size();
+	for (size_t i = 0; i < m; ++i)
+		ptrd[i] *= ptrs[i];
+	return *this;
+}
+template<class T> matrix<T>& matrix<T>::operator/= (const matrix<T>& mx) {
+	assert(mx.rows() == num_rows && mx.cols() == num_cols);
+	const T *ptrs = mx.ptr();
+	T *ptrd = data.data();
+	size_t m = mx.size();
+	for (size_t i = 0; i < m; ++i)
+		ptrd[i] /= ptrs[i];
+	return *this;
+}
+template<class T> matrix<T>& matrix<T>::operator+= (const view<T>& mx) {
+	assert(mx.rows() == this->rows() && mx.cols() == this->cols());
+	T *ptrd = data.data();
+	for (size_t i=0; i < num_rows; ++i)
+		for (size_t j=0; j < num_cols; ++j)
+			ptrd[i*num_cols + j] += mx(i,j);
+	return *this;
+}
+template<class T> matrix<T>& matrix<T>::operator-= (const view<T>& mx) {
+	assert(mx.rows() == this->rows() && mx.cols() == this->cols());
+	T *ptrd = data.data();
+	for (size_t i=0; i < num_rows; ++i)
+		for (size_t j=0; j < num_cols; ++j)
+			ptrd[i*num_cols + j] -= mx(i,j);
+	return *this;
+}
+template<class T> matrix<T>& matrix<T>::operator*= (const view<T>& mx) {
+	assert(mx.rows() == this->rows() && mx.cols() == this->cols());
+	T *ptrd = data.data();
+	for (size_t i=0; i < num_rows; ++i)
+		for (size_t j=0; j < num_cols; ++j)
+			ptrd[i*num_cols + j] *= mx(i,j);
+	return *this;
+}
+template<class T> matrix<T>& matrix<T>::operator/= (const view<T>& mx) {
+	assert(mx.rows() == this->rows() && mx.cols() == this->cols());
+	T *ptrd = data.data();
+	for (size_t i=0; i < num_rows; ++i)
+		for (size_t j=0; j < num_cols; ++j)
+			ptrd[i*num_cols + j] /= mx(i,j);
 	return *this;
 }
 template<class T> matrix<T>& matrix<T>::dot(const matrix<T>& mx) {
@@ -1162,7 +1329,7 @@ template<class T> view<T> matrix<T>::c_ (int c) {
 	return v;
 }
 
-template<class T> view<T> matrix<T>::grid (const matrix<unsigned char>& rows_, const matrix<unsigned char>& cols_) {
+template<class T> view<T> matrix<T>::rc_ (const matrix<unsigned char>& rows_, const matrix<unsigned char>& cols_) {
 	assert (rows_.rows() == num_rows && rows_.cols() == 1 && cols_.rows() == 1 && cols_.cols() == num_cols);
 	vector<size_t> cols, rows;
 	for (size_t i=0; i < rows_.size(); ++i)
@@ -1175,7 +1342,7 @@ template<class T> view<T> matrix<T>::grid (const matrix<unsigned char>& rows_, c
 	return v;
 }
 
-template<class T> view<T> matrix<T>::grid (const vector<size_t>& rows_, const std::vector<size_t>& cols_) {
+template<class T> view<T> matrix<T>::rc_ (const vector<size_t>& rows_, const vector<size_t>& cols_) {
 	assert(rows_.size() > 0 && cols_.size() > 0);
 	vector<size_t> cols, rows;
 	for (size_t i=0; i < rows_.size(); ++i) {
@@ -1193,7 +1360,7 @@ template<class T> view<T> matrix<T>::grid (const vector<size_t>& rows_, const st
 	view<T> v(num_rows, num_cols, cols, rows, data.data());
 	return v;
 }
-template<class T> view<T> matrix<T>::area (int r1, int r2, int c1, int c2) {
+template<class T> view<T> matrix<T>::rc_ (int r1, int r2, int c1, int c2) {
 	assert ((r1 <= r2 && r2 < num_rows) ||
 					(r1 < num_rows && r2 == matrix<T>::END) ||
 					(r1 == r2 && r2 == matrix<T>::END) ||

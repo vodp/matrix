@@ -422,7 +422,7 @@ template<class T> view<T> view<T>::c_ (size_t c) {
 template<class T> matrix<T> view<T>::detach () {
 	assert (ptr != NULL && strides.size() > 0 && steps.size() > 0);
 	matrix<T> mx(steps.size(), strides.size());
-	T *p = mx->mutable_ptr();
+	T *p = mx.mutable_ptr();
 	size_t ix = 0;
 	for (size_t i=0; i < steps.size(); ++i)
 		for (size_t j=0; j < strides.size(); ++j)
