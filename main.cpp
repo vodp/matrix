@@ -155,7 +155,7 @@ void csil_sanitycheck () {
 void gen_training_data () {
 	// load filenames
 	cout << "Loading image list..." << endl;
-	vector<string> images(18389592);
+	vector<string> images;
 	ifstream file("../dat/20m_signatures_random.lst");
 	assert(file.is_open());
 	string line;
@@ -164,11 +164,13 @@ void gen_training_data () {
 	}
 	cout << "..." << images.size() << " images were loaded" << endl;
 	matrix<float> coeffs = matrix<float>::load("../dat/coeffs.bin", 5000, 1);
+	cout << coeffs.size() << " coefficients loaded" << endl;
 	matrix<size_t> top_clusters = matrix_argsort(coeffs);
+
 	view<size_t> top1k = top_clusters.c_(0,1000);
 	cout << "Top 1000 clusters with largest Silhouette coefficients chosen" << endl;
 	cout << "The largest Silhouette coefficient = " << coeffs(top1k(0,0), 0) << endl;
-	cout << "The smallest Silhouette coefficient = " << coeffs(top1k(matrix<size_t>::END,0), 0) << endl;
+	cout << "The smallest Silhouette coefficient = " << coeffs(top1k(999,0), 0) << endl;
 	cout << "Loading labels..." << endl;
 	matrix<int>  y = load_labels("../dat/cluster_20msig_5kcenter_random.lst");
 	ofstream train_file("../dat/train.txt", ios::out);
