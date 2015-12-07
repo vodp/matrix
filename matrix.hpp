@@ -782,7 +782,7 @@ template<class T> matrix<T> matrix<T>::load (const char *filename, size_t rows, 
 	T *memblock = new T[array_len];
 	file.read((char*)memblock, size);
 	file.close();
-	matrix<T> data = (memblock, rows, cols);
+	matrix<T> data(memblock, rows, cols);
 	delete memblock;
 	return data;
 }
